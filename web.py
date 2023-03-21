@@ -51,6 +51,7 @@ if not os.path.exists('.venv'):
     print("The virtual environment '.venv' does not exist. Now creating the virtual environment as .venv")
     Popen(['bash', '-c', 'python3 -m venv .venv']).wait()
     print("The virtual environment '.venv' has been created")
+    override = True
 elif os.path.exists('.venv'):
     override = str(input("The virtual environment '.venv' does exist. Would you like to override it? (yes or no) "))
     if (override == "y" or override == "Y" or 
@@ -83,7 +84,7 @@ if override:
         print("The package 'volttron-ansible' has been installed inside the virtual environment '.venv'.")
     else:
         print("The package 'volttron-ansible' is already installed.")
-else:
+if not override:
     print("Now checking if the package 'volttron-ansible' is installed.")
     time.sleep(1)
     if not os.path.exists(os.path.expanduser("~") + "/.ansible/roles/volttron-ansible"):
