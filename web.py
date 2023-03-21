@@ -99,6 +99,7 @@ if not override:
 hostName = 'localhost'
 serverPort = 8080
 
+# Example page for web server
 class myServer(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -110,6 +111,7 @@ class myServer(BaseHTTPRequestHandler):
         self.wfile.write(bytes("<p>This is an example web server.</p>", "utf-8"))
         self.wfile.write(bytes("</body></html>", "utf-8"))
 
+# Start web server and open default browser pointed to 'http://localhost:8080'; Server only gets closed after KeyboardInterrupt
 if __name__ =="__main__":
     print("Now starting local web server.")
     webServer = HTTPServer((hostName, serverPort), myServer)
