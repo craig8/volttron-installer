@@ -1,5 +1,6 @@
 from subprocess import Popen, run, call, check_output
-import subprocess
+from http.server import BaseHTTPRequestHandler,HTTPServer
+import webbrowser
 import sys
 import os
 import time
@@ -12,7 +13,8 @@ if sys.version_info < (3, 10):
 
 # Check if the ansible and git package are installed; Install ansible and git if not installed
 print("Now checking if the ansible and git packages are installed.")
-dpkg_output = subprocess.check_output(['dpkg', '-l'])
+time.sleep(1)
+dpkg_output = check_output(['dpkg', '-l'])
 
 packages = [line.split()[1] for line in dpkg_output.decode().splitlines() if line.startswith('ii')]
 ansible_installed = False
@@ -44,6 +46,7 @@ elif git_installed:
     override the current .venv or name the virtual environment as something else.
 '''
 print("Now checking if the virtual environment '.venv' exists.")
+time.sleep(1)
 if not os.path.exists('.venv'):
     print("The virtual environment '.venv' does not exist. Now creating the virtual environment as .venv")
     Popen(['bash', '-c', 'python3 -m venv .venv']).wait()
@@ -72,6 +75,7 @@ elif os.path.exists('.venv'):
 # Activate the virtual environment and install volttron-ansible depending on whether the venv was overriden or not.
 if override:
     print("Now checking if the package 'volttron-ansible' is installed.")
+    time.sleep(1)
     if not os.path.exists(os.path.expanduser("~") + "/.ansible/roles/volttron-ansible"):
         print("The package 'volttron-ansible' is not installed.")
         print("Now activating the virtual environment '.venv' and installing the package 'volttron-ansible'.")
@@ -81,6 +85,7 @@ if override:
         print("The package 'volttron-ansible' is already installed.")
 else:
     print("Now checking if the package 'volttron-ansible' is installed.")
+    time.sleep(1)
     if not os.path.exists(os.path.expanduser("~") + "/.ansible/roles/volttron-ansible"):
         print("The package 'volttron-ansible' has not been installed.")
         print(f"Now activating the virtual environemnt '{venv_name}' and installing the package 'volttron-ansible'.")
@@ -88,3 +93,35 @@ else:
         print(f"The package 'volttron-ansible' has been installed inside the virtual environment '{venv_name}'.")
     else:
         print("The package 'volttron-ansible' is already installed.")
+
+# ----------------------------- WEB SERVER -----------------------------
+hostName = 'localhost'
+serverPort = 8080
+
+class myServer(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-type", "text/html")
+        self.end_headers()
+        self.wfile.write(bytes("<html><head><title>Test Server</title></head>", "utf-8"))
+        self.wfile.write(bytes("<p>Request: %s</p>" % self.path, "utf-8"))
+        self.wfile.write(bytes("<body>", "utf-8"))
+        self.wfile.write(bytes("<p>This is an example web server.</p>", "utf-8"))
+        self.wfile.write(bytes("</body></html>", "utf-8"))
+
+if __name__ =="__main__":
+    print("Now starting local web server.")
+    webServer = HTTPServer((hostName, serverPort), myServer)
+    print("Server started at http://%s:%s" % (hostName, serverPort))
+
+    print("Now opening local web server using default browser.")
+    time.sleep(1)
+    webbrowser.open(url="http://%s:%s" % (hostName, serverPort))
+
+    try:
+        webServer.serve_forever()
+    except KeyboardInterrupt:
+        pass
+
+    webServer.server_close()
+    print("Server has been closed.")
