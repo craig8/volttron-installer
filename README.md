@@ -1,5 +1,8 @@
 # volttron-installer
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> c4194d6 (Added Instructions Regarding Issue #1)
 ### Installing Prerequisites
 1. Ensure that Python version 3.10[^1] is installed by running `python3.10 --version`
    - If Python 3.10 is not installed, add the deadsnakes PPA by running `sudo add-apt-repository ppa:deadsnakes/ppa`
@@ -16,5 +19,8 @@
    - Starts a web server and opens the default browser, pointing to 'http://localhost:8080'
 
 [^1]: Any version of Python greater than 3.10 will work
+<<<<<<< HEAD
 =======
 >>>>>>> 7963aec (Update README.md)
+=======
+>>>>>>> c4194d6 (Added Instructions Regarding Issue #1)
