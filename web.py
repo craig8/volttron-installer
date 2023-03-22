@@ -7,9 +7,8 @@ import time
 
 # Check python version. If less than 3.10; Install latest version of python if not installed or correct version
 if sys.version_info < (3, 10):
-    print("You do not have version Python version 3.10 or higher installed. Now installing the latest version with apt.")
-    Popen(['bash', '-c', 'sudo apt install python3 python3-venv']).wait()
-    print("The lastest version of Python 3 has been installed.")
+    print("You do not have version Python version 3.10 or higher installed. Please install Python version 3.10 or higher to continue.")
+    exit()
 
 # Check if the ansible and git package are installed; Install ansible and git if not installed
 print("Now checking if the ansible and git packages are installed.")
@@ -27,14 +26,14 @@ for package in packages:
     
 if not ansible_installed:
     print("Ansible has not been installed. Now installing the ansible package using apt.")
-    Popen(['bash', '-c', 'sudo apt install ansible']).wait()
+    Popen(['bash', '-c', 'sudo apt-get install -y ansible']).wait()
     print("Ansible has now been installed.")
 elif ansible_installed:
     print("Ansible is already installed.")
 
 if not git_installed:
     print("Git has not been installed. Now installing the git package using apt.")
-    Popen(['bash', '-c', 'sudo apt install git']).wait()
+    Popen(['bash', '-c', 'sudo apt-get install -y git']).wait()
     print("Git has now been installed.")
 elif git_installed:
     print("Git is already installed.")
@@ -54,19 +53,13 @@ if not os.path.exists('.venv'):
     override = True
 elif os.path.exists('.venv'):
     override = str(input("The virtual environment '.venv' does exist. Would you like to override it? (yes or no) "))
-    if (override == "y" or override == "Y" or 
-        override == "yes" or override == "Yes" or 
-        override == "yEs" or override == "yeS" or
-        override == "YEs" or override == "YeS" or
-        override == "yES" or override == "YES" ):
+    if (override.startswith("Y") or override.startswith("y")):
         override = True
         venv_name = False
         print("Now overriding the current virtual environment.")
         Popen(['bash', '-c', 'python3 -m venv .venv']).wait()
         print("The virtual environment '.venv' has been created and has overridden the previous virtual environment.")
-    elif (override == "n" or override == "N" or
-          override == "no" or override == "No" or
-          override == "nO" or override == "NO"):
+    elif (override.startswith("N") or override.startswith("n")):
           override = False
           venv_name = str(input("What would you like the new virtual environment to be named? "))
           print(f"Now creating the virtual environment '{venv_name}'.")
