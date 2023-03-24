@@ -52,19 +52,24 @@ if not os.path.exists('.venv'):
     print("The virtual environment '.venv' has been created")
     override = True
 elif os.path.exists('.venv'):
-    override = str(input("The virtual environment '.venv' does exist. Would you like to override it? (yes or no) "))
-    if (override.upper().startswith("Y")):
-        override = True
-        venv_name = False
-        print("Now overriding the current virtual environment.")
-        Popen(['bash', '-c', 'python3 -m venv .venv']).wait()
-        print("The virtual environment '.venv' has been created and has overridden the previous virtual environment.")
-    elif (override.upper().startswith("N")):
-          override = False
-          venv_name = str(input("What would you like the new virtual environment to be named? "))
-          print(f"Now creating the virtual environment '{venv_name}'.")
-          Popen(['bash', '-c', f'python3 -m venv {venv_name}']).wait()
-          print(f"The virtual environment '{venv_name}' has been created.")
+    while True:
+        override = str(input("The virtual environment '.venv' does exist. Would you like to override it? (yes or no) "))
+        if (override.upper().startswith("Y")):
+            override = True
+            venv_name = False
+            print("Now overriding the current virtual environment.")
+            Popen(['bash', '-c', 'python3 -m venv .venv']).wait()
+            print("The virtual environment '.venv' has been created and has overridden the previous virtual environment.")
+            break
+        elif (override.upper().startswith("N")):
+            override = False
+            venv_name = str(input("What would you like the new virtual environment to be named? "))
+            print(f"Now creating the virtual environment '{venv_name}'.")
+            Popen(['bash', '-c', f'python3 -m venv {venv_name}']).wait()
+            print(f"The virtual environment '{venv_name}' has been created.")
+            break
+        else:
+            print("Please enter yes or no.")
 
 # Activate the virtual environment and install volttron-ansible depending on whether the venv was overriden or not.
 if override:
