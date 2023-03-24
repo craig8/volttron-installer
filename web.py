@@ -8,7 +8,7 @@ import time
 # Check python version. If less than 3.10; Install latest version of python if not installed or correct version
 if sys.version_info < (3, 10):
     print("You do not have version Python version 3.10 or higher installed. Please install Python version 3.10 or higher to continue.")
-    exit()
+    sys.exit(1)
 
 # Check if the ansible and git package are installed; Install ansible and git if not installed
 print("Now checking if the ansible and git packages are installed.")
@@ -53,13 +53,13 @@ if not os.path.exists('.venv'):
     override = True
 elif os.path.exists('.venv'):
     override = str(input("The virtual environment '.venv' does exist. Would you like to override it? (yes or no) "))
-    if (override.startswith("Y") or override.startswith("y")):
+    if (override.upper().startswith("Y")):
         override = True
         venv_name = False
         print("Now overriding the current virtual environment.")
         Popen(['bash', '-c', 'python3 -m venv .venv']).wait()
         print("The virtual environment '.venv' has been created and has overridden the previous virtual environment.")
-    elif (override.startswith("N") or override.startswith("n")):
+    elif (override.upper().startswith("N")):
           override = False
           venv_name = str(input("What would you like the new virtual environment to be named? "))
           print(f"Now creating the virtual environment '{venv_name}'.")
