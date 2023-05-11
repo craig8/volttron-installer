@@ -1,10 +1,19 @@
 from subprocess import Popen, run, call, check_output, PIPE
 from http.server import BaseHTTPRequestHandler, HTTPServer, SimpleHTTPRequestHandler
+from urllib.parse import parse_qs
 import webbrowser
 import json
 import sys
 import os
 import time
+
+# Varibales for package installation
+pip_installed = False
+ansible_installed = False
+git_installed = False
+venv_installed = False
+pexpect_installed = False
+pexpect_upgraded = False
 
 # Check python version. If not 3.10, prompt user to download Python 3.10 and exit program
 python_version_cmd = Popen(['bash', '-c', 'python3.10 -V'], stdout=PIPE, stderr=PIPE)
@@ -14,24 +23,34 @@ if not python_version.startswith("Python 3.10"):
     print("Python 3.10 has not been installed. Please install Python 3.10 before continuing.")
     print("Exiting...")
     sys.exit(1)
-# Check if the ansible, git and python3.10-venv packages are installed; Install ansible, git and python3.10-venv if not installed
-print("Now checking if the ansible, git, and python3.10-venv packages are installed.")
-time.sleep(1)
-dpkg_output = check_output(['dpkg', '-l'])
 
+# Check if the ansible, git, pexpect, pip and python3.10-venv packages are installed; Install ansible, git, pexpect, pip and python3.10-venv if not installed
+print("Now checking if the ansible, git, pexpect, pip and python3.10-venv packages are installed.")
+time.sleep(1)
+
+dpkg_output = check_output(['dpkg', '-l'])
 packages = [line.split()[1] for line in dpkg_output.decode().splitlines() if line.startswith('ii')]
-ansible_installed = False
-git_installed = False
-venv_installed = False
+
+pexpect_version_cmd = Popen(['bash', '-c', 'pip freeze | grep pexpect'], stdout=PIPE, stderr=PIPE)
+pexpect_version = pexpect_version_cmd.stdout.read().decode("utf-8")
 
 for package in packages:
     if package == "ansible":
         ansible_installed = True
     if package == "git":
         git_installed = True
+    if package == "python3-pip":
+        pip_installed = True
     if package == "python3.10-venv":
         venv_installed = True
-    
+
+if pexpect_version.startswith("pexpect==4"):
+    pexpect_installed = True
+    pexpect_upgraded = True
+elif not pexpect_version.startswith("pexpect==4"):
+    pexpect_installed = True
+    pexpect_upgraded = False
+
 if not ansible_installed:
     print("Ansible has not been installed. Now installing the ansible package using apt.")
     Popen(['bash', '-c', 'sudo apt-get install -y ansible']).wait()
@@ -45,6 +64,24 @@ if not git_installed:
     print("Git has now been installed.")
 elif git_installed:
     print("Git is already installed.")
+
+if not pip_installed:
+    print("Pip has not been installed. Now installing the pip package using apt.")
+    Popen(['bash', '-c', 'sudo apt install python3-pip']).wait()
+    print("Pip has now been installed.")
+elif pip_installed:
+    print("Pip is already installed.")
+
+if not pexpect_installed:
+    print("Pexpect has not been installed. Now installing the pexpect package.")
+    Popen(['bash', '-c', 'pip install pexpect']).wait()
+    print("Pexpect has been installed to its latest version.")
+elif pexpect_installed and not pexpect_upgraded:
+    print("Pexpect is installed but is not the correct version. Now updating the pexpect package.")
+    Popen(['bash', '-c', 'pip install --upgrade pexpect']).wait()
+    print("Pexpect has been upgraded to its latest version.")
+elif pexpect_installed and pexpect_upgraded:
+    print("Pexpect has already been installed")
 
 if not venv_installed:
     print("Python3.10-venv has not been installed. Now installing the python3.10-venv package using apt.")
@@ -113,6 +150,7 @@ print("Cloning volttron-installer repository so the web server can access requir
 Popen(['bash', '-c', 'git clone https://github.com/VOLTTRON/volttron-installer.git']).wait()
 
 # ----------------------------- WEB SERVER -----------------------------
+import pexpect #Import pexpect as it is was installed earlier and not used until now
 hostName = "localhost"
 serverPort = 8080
 
@@ -135,6 +173,18 @@ class myServer(BaseHTTPRequestHandler):
     def do_POST(self):
         # Install base req's when button is clicked
         if self.path == '/install-base-req':
+
+            # Get data from post request; If no password was entered, prompt user to enter password again
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length).decode('utf-8')
+            post_params = parse_qs(post_data)
+            if not post_params:
+                self.send_response(200)
+                self.send_header("Content-type", "application/json")
+                self.end_headers()
+                message = {'message': 'Please enter your password, then click \'Install Base Requirements\''}
+                self.wfile.write(json.dumps(message).encode())
+
             # Edit files required for ansible one-liners to work
             set_defaults_filepath = "~/.ansible/collections/ansible_collections/volttron/deployment/roles/set_defaults/tasks/main.yml"
             with open(os.path.expanduser(set_defaults_filepath), 'r+') as edit_set_defaults:
@@ -145,22 +195,26 @@ class myServer(BaseHTTPRequestHandler):
 
                 edit_set_defaults.writelines(lines)
                 edit_set_defaults.truncate()
-
-            Popen(['bash', '-c', 'cp -fR ~/.ansible/collections/ansible_collections/volttron/deployment/examples/vagrant-vms/collector1/configs/ ~/'])
             
+            # Install Base Requirements
             print("Now installing the base requirements for VOLTTRON")
 
-            # Ansible commands to install base req's
-            Popen(['bash', '-c', 'ansible-playbook -K -i localhost, --connection=local volttron.deployment.host_config'], stdin=PIPE, stdout=PIPE, stderr=PIPE).wait()
+            if post_params:
+                host_config_process = pexpect.spawn("ansible-playbook -K -i localhost, --connection=local volttron.deployment.host_config") # Using pexpect for password input for ansible
+                host_config_process.expect("BECOME password: ")
+                host_config_process.sendline(post_params["password"][0])
+                
+                host_config_process.expect(pexpect.EOF)
+                print(host_config_process.before.decode())
 
-            Popen(['bash', '-c', 'ansible-playbook -i localhost, --connection=local volttron.deployment.install_platform'], stdout=PIPE, stderr=PIPE).wait()
+                Popen(['bash', '-c', 'ansible-playbook -i localhost, --connection=local volttron.deployment.install_platform'], stderr=PIPE).wait()
 
-            # Success pop-up
-            self.send_response(200)
-            self.send_header("Content-type", "application/json")
-            self.end_headers()
-            message = {'message': 'The base requirements have been installed'}
-            self.wfile.write(json.dumps(message).encode())
+                # Success pop-up
+                self.send_response(200)
+                self.send_header("Content-type", "application/json")
+                self.end_headers()
+                message = {'message': 'The base requirements have been installed'}
+                self.wfile.write(json.dumps(message).encode())
 
 # Start web server and open default browser pointed to "http://localhost:8080"; Server only gets closed after KeyboardInterrupt
 if __name__ =="__main__":

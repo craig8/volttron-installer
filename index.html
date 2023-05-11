@@ -14,16 +14,18 @@
                         alert(response.message);
                     }
                 };
-                xhr.send();
+                var data = 'password=' + encodeURIComponent(document.getElementById('password').value);
+                xhr.send(data);
             }
         </script>
     </head>
     <body>
         <h1>VOLTTRON Deployment and Manager</h1>
         <p>To install the base requirements for VOLTTRON, click 'Install Base Requirements' below then navigate back to the terminal to continue installing.</p>
-        <form onsubmit="event.preventDefault(); installBaseReq();">
+        <form onsubmit="event.preventDefault(); installBaseReq();" enctype="application/x-www-form-urlencoded">
+            <label for="password">Password:</label>
+            <input type="password" name="password" id="password"/>
             <button type="submit">Install Base Requirements</button>
-            <input name="password" type="password" id="password"/>
         </form>
     </body>
 </html>
