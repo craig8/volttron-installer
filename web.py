@@ -104,6 +104,7 @@ if not os.path.exists('.venv'):
     print("The virtual environment '.venv' has been created")
     override = True
 elif os.path.exists('.venv'):
+    sys.stdin.flush()
     while True:
         override = str(input("The virtual environment '.venv' does exist. Would you like to override it? (yes or no) "))
         if (override.upper().startswith("Y")):
