@@ -147,7 +147,7 @@ if not override:
 
 # Clone repo so web server can access files related to the web server
 print("Cloning volttron-installer repository so the web server can access required files")
-Popen(['bash', '-c', 'git clone https://github.com/VOLTTRON/volttron-installer.git']).wait()
+Popen(['bash', '-c', 'git clone --branch develop https://github.com/VOLTTRON/volttron-installer.git,develop']).wait()
 
 # ----------------------------- WEB SERVER -----------------------------
 import pexpect # Import pexpect as it is was installed earlier and not used until now
@@ -157,7 +157,7 @@ serverPort = 8080
 # Page for web server that will be used for management
 class myServer(BaseHTTPRequestHandler):
     def do_GET(self):
-        self.path = "index.html"
+        self.path = os.getcwd() + "/volttron-installer/index.html"
         
         try:
             homePage = open(self.path).read()
