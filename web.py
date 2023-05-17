@@ -6,7 +6,6 @@ import json
 import sys
 import os
 import time
-import pexpect
 
 # Varibales for package installation
 pip_installed = False
@@ -151,7 +150,7 @@ print("Cloning volttron-installer repository so the web server can access requir
 Popen(['bash', '-c', 'git clone https://github.com/VOLTTRON/volttron-installer.git']).wait()
 
 # ----------------------------- WEB SERVER -----------------------------
-#import pexpect # Import pexpect as it is was installed earlier and not used until now
+import pexpect # Import pexpect as it is was installed earlier and not used until now
 hostName = "localhost"
 serverPort = 8080
 
