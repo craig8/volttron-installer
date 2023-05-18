@@ -147,7 +147,7 @@ if not override:
 
 # Clone repo so web server can access files related to the web server
 print("Cloning volttron-installer repository so the web server can access required files")
-Popen(['bash', '-c', 'git clone --branch develop https://github.com/VOLTTRON/volttron-installer.git,develop']).wait()
+Popen(['bash', '-c', 'git clone --branch develop https://github.com/VOLTTRON/volttron-installer.git']).wait()
 
 # ----------------------------- WEB SERVER -----------------------------
 import pexpect # Import pexpect as it is was installed earlier and not used until now
