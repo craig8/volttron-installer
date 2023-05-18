@@ -173,10 +173,10 @@ class myServer(BaseHTTPRequestHandler):
         if self.path == "/install-base-req":
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length).decode('utf-8')
-            password = parse_qs(post_data)
+            credentials = parse_qs(post_data)
 
             # Assumes correct password is entered first time
-            if not password:
+            if not credentials:
                 self.send_response(200)
                 self.send_header("Content-type", "application/json")
                 self.end_headers()
@@ -185,7 +185,7 @@ class myServer(BaseHTTPRequestHandler):
             else:
                 host_config_process = pexpect.spawn("ansible-playbook -K -i localhost, --connection=local volttron.deployment.host_config")
                 host_config_process.expect("BECOME password: ")
-                host_config_process.sendline(post_params["password"][0])
+                host_config_process.sendline(credentials["password"][0])
                 
                 host_config_process.expect(pexpect.EOF)
                 print(host_config_process.before.decode())
