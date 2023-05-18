@@ -154,10 +154,9 @@ import pexpect # Import pexpect as it is was installed earlier and not used unti
 hostName = "localhost"
 serverPort = 8080
 
-# Page for web server that will be used for management
 class myServer(BaseHTTPRequestHandler):
     def do_GET(self):
-        self.path = os.getcwd() + "/volttron-installer/index.html"
+        self.path = "index.html"
         
         try:
             homePage = open(self.path).read()
@@ -171,50 +170,53 @@ class myServer(BaseHTTPRequestHandler):
         self.wfile.write(bytes(homePage, "utf-8"))
     
     def do_POST(self):
-        # Install base req's when button is clicked
-        if self.path == '/install-base-req':
-
-            # Get data from post request; If no password was entered, prompt user to enter password again
+        if self.path == "/install-base-req":
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length).decode('utf-8')
-            post_params = parse_qs(post_data)
-            if not post_params:
+            password = parse_qs(post_data)
+
+            # Assumes correct password is entered first time
+            if not password:
                 self.send_response(200)
                 self.send_header("Content-type", "application/json")
                 self.end_headers()
-                message = {'message': 'Please enter your password, then click \'Install Base Requirements\''}
+                message = {'message': 'Please enter your password'}
                 self.wfile.write(json.dumps(message).encode())
-
-            # Edit files required for ansible one-liners to work
-            set_defaults_filepath = "~/.ansible/collections/ansible_collections/volttron/deployment/roles/set_defaults/tasks/main.yml"
-            with open(os.path.expanduser(set_defaults_filepath), 'r+') as edit_set_defaults:
-                lines = edit_set_defaults.readlines()
-
-                lines[116] = "    deployment_platform_config_file: \"{{ deployment_platform_config_file | default( \'~/.ansible/collections/ansible_collections/volttron/deployment/examples/vagrant-vms/collector1/collector1.yml\' ) }}\"\n"
-                edit_set_defaults.seek(0)
-
-                edit_set_defaults.writelines(lines)
-                edit_set_defaults.truncate()
-            
-            # Install Base Requirements
-            print("Now installing the base requirements for VOLTTRON")
-
-            if post_params:
-                host_config_process = pexpect.spawn("ansible-playbook -K -i localhost, --connection=local volttron.deployment.host_config") # Using pexpect for password input for ansible
+            else:
+                host_config_process = pexpect.spawn("ansible-playbook -K -i localhost, --connection=local volttron.deployment.host_config")
                 host_config_process.expect("BECOME password: ")
                 host_config_process.sendline(post_params["password"][0])
                 
                 host_config_process.expect(pexpect.EOF)
                 print(host_config_process.before.decode())
-
-                Popen(['bash', '-c', 'ansible-playbook -i localhost, --connection=local volttron.deployment.install_platform'], stderr=PIPE).wait()
-
-                # Success pop-up
+                
                 self.send_response(200)
                 self.send_header("Content-type", "application/json")
                 self.end_headers()
                 message = {'message': 'The base requirements have been installed'}
                 self.wfile.write(json.dumps(message).encode())
+        
+        if self.path == "/create-instance":
+            Popen(['bash', '-c', 'ansible-playbook -i localhost, --connection=local volttron.deployment.install_platform']).wait()
+            Popen(['bash', '-c', 'ansible-playbook -i localhost, --connection=local volttron.deployment.run_platforms']).wait()
+
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.end_headers()
+            message = {'message': 'A VOLTTRON instance has been created and is now running'}
+            self.wfile.write(json.dumps(message).encode())
+        
+        if self.path == "/configure-agents":
+            content_length = int(self.headers['Content-Length'])
+            picked_services = self.rfile.read(content_length).decode('utf-8')
+            
+            print(picked_services)
+            
+            self.send_response(200)
+            self.send_header("Content-type", "application/json")
+            self.end_headers()
+            message = {'message': 'Agents have been installed'}
+            self.wfile.write(json.dumps(message).encode())
 
 # Start web server and open default browser pointed to "http://localhost:8080"; Server only gets closed after KeyboardInterrupt
 if __name__ =="__main__":
