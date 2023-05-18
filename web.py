@@ -156,7 +156,7 @@ serverPort = 8080
 
 class myServer(BaseHTTPRequestHandler):
     def do_GET(self):
-        self.path = "index.html"
+        self.path = os.getcwd() + "/volttron-installer/index.html"
         
         try:
             homePage = open(self.path).read()
