@@ -39,10 +39,10 @@
                         alert(response.message);
                     }
                 };
-                var checkboxes = document.querySelectorAll("input[name='checkbox']:checked");
+                var checkboxes = document.querySelectorAll('input[name="checkbox"]:checked');
                 var data = Array.from(checkboxes).map(checkbox => checkbox.value);
 
-                xhr.send(JSON.stringify(data));
+                xhr.send(JSON.stringify({ data }));
             }
         </script>
     </head>
@@ -59,7 +59,7 @@
             <button type="submit">Create Instance</button>
         </form>
         <p>Pick any of the following services then click 'Install Services' to install them.</p>
-        <form onsubmit="event.preventDefault(); configureAgents();" enctype="application/x-www-form-urlencoded">
+        <form onsubmit="event.preventDefault(); configureAgents();" enctype="application/x-www-form-urlencoded" id="config_form">
             <input type="checkbox" id="agent1" name="checkbox" value="actuator_agent">
             <label for="agent1"> Acutator Agent</label>
             <input type="checkbox" id="agent2" name="checkbox" value="bacnet">
