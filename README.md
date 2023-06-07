@@ -12,8 +12,15 @@
    - Installs the ansible, git, pexpect, pip and python3.10-venv packages if they are not already installed
    - Creates and activates a virtual environment in the directory where the script was ran
    - Installs the volttron-ansible collection
+   - Prompts user to choose the amount of instances they want installed (maximum of 5)
    - Starts a web server and opens the default browser, pointing to 'http://localhost:8080'
-2. Navigating the Web Page
-   - Click 'Install Base Requirements' to install what you need for volttron
-     - Navigate back to where the script was ran and enter your password to continue the installation process
-[^1]: Any version of Python greater than 3.10 will work
+2. Navigating the Web Page - 1 instance
+   - Enter password then click 'Install Base Requirements' to install what is needed for volttron
+   - After the base requirements have been installed, click 'Create Instance' to create and run the instance
+   - After installation, pick whatever services are needed for the instance and click 'Install Services'
+   - Start and stop buttons for the instance are show on the bottom of the page
+3. Navigating the Web Page - Multiple Instances
+   - Pick what services are needed for each instance and click 'Configure Instance'
+   - Navigate to the bottom of the page to enter your password, then click 'Install All Instances'
+   - Start and stop buttons are provided under 'Configure Instance' for each instance
+[^1]: Any version of Python greater than 3.8 will work

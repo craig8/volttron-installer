@@ -167,7 +167,7 @@ class myServer(BaseHTTPRequestHandler):
     def do_GET(self):
         # Different web page for different number of instances
         if (num_instances == 1):
-            self.path = os.getcwd() + "/index.html"
+            self.path = os.getcwd() + "/volttron-installer/index.html"
 
             try:
                 homePage = open(self.path).read()
@@ -180,7 +180,7 @@ class myServer(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(bytes(homePage, "utf-8"))
         elif (num_instances > 1):
-            self.path = os.getcwd() + "/multiple_instances.html"
+            self.path = os.getcwd() + "/volttron-installer/multiple_instances.html"
 
             try:
                 homePage = open(self.path).read()
@@ -204,8 +204,10 @@ class myServer(BaseHTTPRequestHandler):
                 inventory.write("\n  hosts:")
                 for host in range(1, num_instances + 1):
                     inventory.write(f"\n    localhost{host}:")
+                    inventory.write(f'\n      volttron_root: "~/volttron_root_{host}"')
                     inventory.write(f'\n      volttron_home: "~/volttron_{host}"')
-
+                    inventory.write(f'\n      volttron_git_branch: "main"')
+                    inventory.write(f'\n      volttron_git_force_clone: "True"')
             # Create forms with checkboxes dependent on the number of instances said to be installed.
             for count in range(1,num_instances + 1):
                 form = f'''
@@ -251,465 +253,605 @@ class myServer(BaseHTTPRequestHandler):
                     <input type="checkbox" id="agent16" name="checkbox_instance_{count}" value="WeatherDotGov">
                     <label for="agent16"> Weather Dot Gov</label>
                     <br>
-                    <input type="submit" value="Install Instance {count}" form="form{count}">
+                    <input type="submit" value="Configure Instance {count}" form="form{count}">
+                </form>
+                <form onsubmit="event.preventDefault(); startVOLTTRON{count}();" enctype="application/x-www-form-urlencoded" id="start_form{count}">
+                    <input type="submit" value="Start VOLTTRON Instance {count}" form="start_form{count}">
+                </form>
+                <form onsubmit="event.preventDefault(); stopVOLTTRON{count}();" enctype="application/x-www-form-urlencoded" id="stop_form{count}">
+                    <input type="submit" value="Stop VOLTTRON Instance {count}" form="stop_form{count}">
                 </form>
                 '''
                 self.wfile.write(form.encode())
 
+            submit_all = '''
+            <p>To finish setting up and install the instances, please enter your password and click 'Install All Instances' Below</p>
+            <form onsubmit="event.preventDefault(); installInstances();" enctype="application/x-www-form-urlencoded" id="install_all">
+                <label for="password">Password:</label>
+                <input type="password" name="password" id="password"/>
+                <button type="submit" style="font-size: 20px">Install All Instances</button>
+            </form>
+            '''
+            
+            self.wfile.write(submit_all.encode())
     def do_POST(self):
-        if self.path == "/install-base-req":
-            content_length = int(self.headers['Content-Length'])
-            post_data = self.rfile.read(content_length).decode('utf-8')
-            credentials = parse_qs(post_data)
+        if (num_instances == 1):
+            if self.path == "/install-base-req":
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length).decode('utf-8')
+                credentials = parse_qs(post_data)
+                
+                # Change to appropriate config file temporarily
+                set_defaults_filepath = "~/.ansible/collections/ansible_collections/volttron/deployment/roles/set_defaults/tasks/main.yml"
+                with open(os.path.expanduser(set_defaults_filepath), 'r+') as edit_set_defaults:
+                    lines = edit_set_defaults.readlines()
+    
+                    lines[116] = "    deployment_platform_config_file: \"{{ deployment_platform_config_file | default( \'~/.ansible/collections/ansible_collections/volttron/deployment/examples/vagrant-vms/collector1/collector1.yml\' ) }}\"\n"
+                    edit_set_defaults.seek(0)
+                    edit_set_defaults.writelines(lines)
+                    edit_set_defaults.truncate()
+    
+                # Assumes correct password is entered first time
+                if not credentials:
+                    self.send_response(200)
+                    self.send_header("Content-type", "application/json")
+                    self.end_headers()
+                    message = {'message': 'Please enter your password'}
+                    self.wfile.write(json.dumps(message).encode())
+                else:
+                    host_config_process = pexpect.spawn("ansible-playbook -K -i localhost, --connection=local volttron.deployment.host_config")
+                    host_config_process.expect("BECOME password: ")
+                    host_config_process.sendline(credentials["password"][0])
+                    
+                    host_config_process.expect(pexpect.EOF)
+                    print(host_config_process.before.decode())
+                    
+                    self.send_response(200)
+                    self.send_header("Content-type", "application/json")
+                    self.end_headers()
+                    message = {'message': 'The base requirements have been installed'}
+                    self.wfile.write(json.dumps(message).encode())
             
-            # Change to appropriate config file temporarily
-            set_defaults_filepath = "~/.ansible/collections/ansible_collections/volttron/deployment/roles/set_defaults/tasks/main.yml"
-            with open(os.path.expanduser(set_defaults_filepath), 'r+') as edit_set_defaults:
-                lines = edit_set_defaults.readlines()
-
-                lines[116] = "    deployment_platform_config_file: \"{{ deployment_platform_config_file | default( \'~/.ansible/collections/ansible_collections/volttron/deployment/examples/vagrant-vms/collector1/collector1.yml\' ) }}\"\n"
-                edit_set_defaults.seek(0)
-                edit_set_defaults.writelines(lines)
-                edit_set_defaults.truncate()
-
-            # Assumes correct password is entered first time
-            if not credentials:
+            if self.path == "/create-instance":
+                Popen(['bash', '-c', 'ansible-playbook -i localhost, --connection=local volttron.deployment.install_platform']).wait()
+                Popen(['bash', '-c', 'ansible-playbook -i localhost, --connection=local volttron.deployment.run_platforms']).wait()
+    
                 self.send_response(200)
                 self.send_header("Content-type", "application/json")
                 self.end_headers()
-                message = {'message': 'Please enter your password'}
+                message = {'message': 'A VOLTTRON instance has been created and is now running'}
                 self.wfile.write(json.dumps(message).encode())
-            else:
-                host_config_process = pexpect.spawn("ansible-playbook -K -i localhost, --connection=local volttron.deployment.host_config")
-                host_config_process.expect("BECOME password: ")
-                host_config_process.sendline(credentials["password"][0])
+            
+            if self.path == "/configure-agents":
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length).decode('utf-8')
+                picked_services = json.loads(post_data)
                 
-                host_config_process.expect(pexpect.EOF)
-                print(host_config_process.before.decode())
+                # Create config file for agents
+                with open(os.getcwd() + '/agent_config.yml', 'w') as config:
+                    config.write("---")
+                    config.write("\nconfig: {}\n")
+                    config.write("\nagents:")
+    
+                    for key, value in picked_services.items():
+                        for service in value:
+                            config_file = "config"
+    
+                            if service == "ActuatorAgent":
+                                config.write("\n  actuator.agent:")
+                            elif service == "BACnetProxy":
+                                config.write("\n  bacnet.proxy:")
+                            elif service == "DataMover":
+                                config.write("\n  data.mover:")
+                            elif service == "DNP3Agent":
+                                config.write("\n  dnp3.agent:")
+                            elif service == "ForwardHistorian":
+                                config.write("\n  forward.historian:")
+                            elif service == "IEEE2030_5Agent":
+                                config.write("\n  ieee.agent:")
+                            elif service == "MongodbTaggingService":
+                                config.write("\n  mongodb.tagging:")
+                            elif service == "MQTTHistorian":
+                                config.write("\n  mqtt.historian:")
+                            elif service == "OpenADRVenAgent":
+                                config_file = "config_example1.json"
+                                config.write("\n  openadrven.agent:")
+                            elif service == "PlatformDriverAgent":
+                                config.write("\n  platformdriver.agent:")
+                            elif service == "SQLAggregateHistorian":
+                                config.write("\n  sqlaggregate.historian:")
+                            elif service == "SQLHistorian":
+                                config_file = "config.sqlite"
+                                config.write("\n  sql.historian:")
+                            elif service == "SQLiteTaggingService":
+                                config.write("\n  sqlite.tagging:")
+                            elif service == "VolttronCentral":
+                                config.write("\n  volttron.central:")
+                            elif service == "VolttronCentralPlatform":
+                                config.write("\n  vc.platform:")
+                            elif service == "WeatherDotGov":
+                                config.write("\n  weather.gov:")
+    
+                            config.write(f"\n    agent_source: '$VOLTTRON_ROOT/services/core/{service}'")
+                            config.write(f"\n    agent_config: '$VOLTTRON_ROOT/services/core/{service}/{config_file}'")
+                            config.write("\n    agent_running: True")
+                            config.write("\n    agent_enabled: True\n")
                 
+                # Change to appropriate config file permanently
+                set_defaults_filepath = "~/.ansible/collections/ansible_collections/volttron/deployment/roles/set_defaults/tasks/main.yml"
+                with open(os.path.expanduser(set_defaults_filepath), 'r+') as edit_set_defaults:
+                    lines = edit_set_defaults.readlines()
+                    lines[116] = "    deployment_platform_config_file: \"{{ deployment_platform_config_file | default( '" + os.getcwd() + "/agent_config.yml' ) }}\"\n"
+                    edit_set_defaults.seek(0)
+                    edit_set_defaults.writelines(lines)
+                    edit_set_defaults.truncate()
+                
+                Popen(['bash', '-c', 'ansible-playbook -i localhost, --connection=local volttron.deployment.configure_agents']).wait()
                 self.send_response(200)
                 self.send_header("Content-type", "application/json")
                 self.end_headers()
-                message = {'message': 'The base requirements have been installed'}
+                message = {'message': 'Agents have been installed'}
                 self.wfile.write(json.dumps(message).encode())
-        
-        if self.path == "/create-instance":
-            Popen(['bash', '-c', 'ansible-playbook -i localhost, --connection=local volttron.deployment.install_platform']).wait()
-            Popen(['bash', '-c', 'ansible-playbook -i localhost, --connection=local volttron.deployment.run_platforms']).wait()
-
-            self.send_response(200)
-            self.send_header("Content-type", "application/json")
-            self.end_headers()
-            message = {'message': 'A VOLTTRON instance has been created and is now running'}
-            self.wfile.write(json.dumps(message).encode())
-        
-        if self.path == "/configure-agents":
-            content_length = int(self.headers['Content-Length'])
-            post_data = self.rfile.read(content_length).decode('utf-8')
-            picked_services = json.loads(post_data)
+    
+            # Start and stop volttron instance for 1 instance
+            if self.path == "/start-volttron":
+                Popen(['bash', '-c', 'ansible-playbook -i localhost, --connection=local volttron.deployment.ad_hoc -e "command=\'volttron -vv -l volttron.log&\'"']).wait()
+    
+                self.send_response(200)
+                self.send_header("Content-type", "application/json")
+                self.end_headers()
+                message = {'message': 'VOLTTRON has been started'}
+                self.wfile.write(json.dumps(message).encode())
             
-            # Create config file for agents
-            with open(os.getcwd() + '/agent_config.yml', 'w') as config:
-                config.write("---")
-                config.write("\nconfig: {}\n")
-                config.write("\nagents:")
+            if self.path == "/stop-volttron":
+                Popen(['bash', '-c', 'ansible-playbook -i localhost, --connection=local volttron.deployment.ad_hoc -e "command=\'vctl shutdown --platform\'"']).wait()
+    
+                self.send_response(200)
+                self.send_header("Content-type", "application/json")
+                self.end_headers()
+                message = {'message': 'VOLTTRON has been stopped'}
+                self.wfile.write(json.dumps(message).encode())
+    
+        # Create config files and install multiple instances (max of 5 currently);
+        if (num_instances > 1):
+            if self.path == "/install-platform1":
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length).decode('utf-8')
+                picked_services = json.loads(post_data)
 
-                for key, value in picked_services.items():
-                    for service in value:
-                        config_file = "config"
+                # Get public IP for vip-address
+                temp_socket = socket(AF_INET, SOCK_DGRAM)
+                temp_socket.connect(('8.8.8.8', 80))
+                ip = temp_socket.getsockname()[0]
+                temp_socket.close()
 
-                        if service == "ActuatorAgent":
-                            config.write("\n  actuator.agent:")
-                        elif service == "BACnetProxy":
-                            config.write("\n  bacnet.proxy:")
-                        elif service == "DataMover":
-                            config.write("\n  data.mover:")
-                        elif service == "DNP3Agent":
-                            config.write("\n  dnp3.agent:")
-                        elif service == "ForwardHistorian":
-                            config.write("\n  forward.historian:")
-                        elif service == "IEEE2030_5Agent":
-                            config.write("\n  ieee.agent:")
-                        elif service == "MongodbTaggingService":
-                            config.write("\n  mongodb.tagging:")
-                        elif service == "MQTTHistorian":
-                            config.write("\n  mqtt.historian:")
-                        elif service == "OpenADRVenAgent":
-                            config_file = "config_example1.json"
-                            config.write("\n  openadrven.agent:")
-                        elif service == "PlatformDriverAgent":
-                            config.write("\n  platformdriver.agent:")
-                        elif service == "SQLAggregateHistorian":
-                            config.write("\n  sqlaggregate.historian:")
-                        elif service == "SQLHistorian":
-                            config_file = "config.sqlite"
-                            config.write("\n  sql.historian:")
-                        elif service == "SQLiteTaggingService":
-                            config.write("\n  sqlite.tagging:")
-                        elif service == "VolttronCentral":
-                            config.write("\n  volttron.central:")
-                        elif service == "VolttronCentralPlatform":
-                            config.write("\n  vc.platform:")
-                        elif service == "WeatherDotGov":
-                            config.write("\n  weather.gov:")
+                with open(os.getcwd() + '/localhost1/localhost1.yml', 'w') as config:
+                    config.write("---")
+                    config.write("\nconfig:")
+                    config.write(f"\n  vip-address: tcp://{ip}:22916\n")
+                    config.write("\nagents:")       
+                    for key, value in picked_services.items():
+                        for service in value:
+                            config_file = "config"
+                            if service == "ActuatorAgent":
+                                config.write("\n  actuator.agent:")
+                            elif service == "BACnetProxy":
+                                config.write("\n  bacnet.proxy:")
+                            elif service == "DataMover":
+                                config.write("\n  data.mover:")
+                            elif service == "DNP3Agent":
+                                config.write("\n  dnp3.agent:")
+                            elif service == "ForwardHistorian":
+                                config.write("\n  forward.historian:")
+                            elif service == "IEEE2030_5Agent":
+                                config.write("\n  ieee.agent:")
+                            elif service == "MongodbTaggingService":
+                                config.write("\n  mongodb.tagging:")
+                            elif service == "MQTTHistorian":
+                                config.write("\n  mqtt.historian:")
+                            elif service == "OpenADRVenAgent":
+                                config_file = "config_example1.json"
+                                config.write("\n  openadrven.agent:")
+                            elif service == "PlatformDriverAgent":
+                                config.write("\n  platformdriver.agent:")
+                            elif service == "SQLAggregateHistorian":
+                                config.write("\n  sqlaggregate.historian:")
+                            elif service == "SQLHistorian":
+                                config_file = "config.sqlite"
+                                config.write("\n  sql.historian:")
+                            elif service == "SQLiteTaggingService":
+                                config.write("\n  sqlite.tagging:")
+                            elif service == "VolttronCentral":
+                                config.write("\n  volttron.central:")
+                            elif service == "VolttronCentralPlatform":
+                                config.write("\n  vc.platform:")
+                            elif service == "WeatherDotGov":
+                                config.write("\n  weather.gov:")
 
-                        config.write(f"\n    agent_source: '$VOLTTRON_ROOT/services/core/{service}'")
-                        config.write(f"\n    agent_config: '$VOLTTRON_ROOT/services/core/{service}/{config_file}'")
-                        config.write("\n    agent_running: True")
-                        config.write("\n    agent_enabled: True\n")
+                            config.write(f"\n    agent_source: '$VOLTTRON_ROOT/services/core/{service}'")
+                            config.write(f"\n    agent_config: '$VOLTTRON_ROOT/services/core/{service}/{config_file}'")
+                            config.write("\n    agent_running: True")
+                            config.write("\n    agent_enabled: True\n")
+
+                self.send_response(200)
+                self.send_header('Content-type', 'text/html')
+                self.end_headers()
+
+            if self.path == '/install-platform2':
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length).decode('utf-8')
+                picked_services = json.loads(post_data)
+
+                # Get public IP for vip-address
+                temp_socket = socket(AF_INET, SOCK_DGRAM)
+                temp_socket.connect(('8.8.8.8', 80))
+                ip = temp_socket.getsockname()[0]
+                temp_socket.close()
+
+                with open(os.getcwd() + '/localhost2/localhost2.yml', 'w') as config:
+                    config.write("---")
+                    config.write("\nconfig:")
+                    config.write(f"\n  vip-address: tcp://{ip}:22917\n")
+                    config.write("\nagents:")       
+                    for key, value in picked_services.items():
+                        for service in value:
+                            config_file = "config"
+                            if service == "ActuatorAgent":
+                                config.write("\n  actuator.agent:")
+                            elif service == "BACnetProxy":
+                                config.write("\n  bacnet.proxy:")
+                            elif service == "DataMover":
+                                config.write("\n  data.mover:")
+                            elif service == "DNP3Agent":
+                                config.write("\n  dnp3.agent:")
+                            elif service == "ForwardHistorian":
+                                config.write("\n  forward.historian:")
+                            elif service == "IEEE2030_5Agent":
+                                config.write("\n  ieee.agent:")
+                            elif service == "MongodbTaggingService":
+                                config.write("\n  mongodb.tagging:")
+                            elif service == "MQTTHistorian":
+                                config.write("\n  mqtt.historian:")
+                            elif service == "OpenADRVenAgent":
+                                config_file = "config_example1.json"
+                                config.write("\n  openadrven.agent:")
+                            elif service == "PlatformDriverAgent":
+                                config.write("\n  platformdriver.agent:")
+                            elif service == "SQLAggregateHistorian":
+                                config.write("\n  sqlaggregate.historian:")
+                            elif service == "SQLHistorian":
+                                config_file = "config.sqlite"
+                                config.write("\n  sql.historian:")
+                            elif service == "SQLiteTaggingService":
+                                config.write("\n  sqlite.tagging:")
+                            elif service == "VolttronCentral":
+                                config.write("\n  volttron.central:")
+                            elif service == "VolttronCentralPlatform":
+                                config.write("\n  vc.platform:")
+                            elif service == "WeatherDotGov":
+                                config.write("\n  weather.gov:")
+
+                            config.write(f"\n    agent_source: '$VOLTTRON_ROOT/services/core/{service}'")
+                            config.write(f"\n    agent_config: '$VOLTTRON_ROOT/services/core/{service}/{config_file}'")
+                            config.write("\n    agent_running: True")
+                            config.write("\n    agent_enabled: True\n")
+
+                self.send_response(200)
+                self.send_header('Content-type', 'text/html')
+                self.end_headers()
+
+            if self.path == '/install-platform3':
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length).decode('utf-8')
+                picked_services = json.loads(post_data)
+
+                # Get public IP for vip-address
+                temp_socket = socket(AF_INET, SOCK_DGRAM)
+                temp_socket.connect(('8.8.8.8', 80))
+                ip = temp_socket.getsockname()[0]
+                temp_socket.close()
+
+                with open(os.getcwd() + '/localhost3/localhost3.yml', 'w') as config:
+                    config.write("---")
+                    config.write("\nconfig:")
+                    config.write(f"\n  vip-address: tcp://{ip}:22918\n")
+                    config.write("\nagents:")       
+                    for key, value in picked_services.items():
+                        for service in value:
+                            config_file = "config"
+                            if service == "ActuatorAgent":
+                                config.write("\n  actuator.agent:")
+                            elif service == "BACnetProxy":
+                                config.write("\n  bacnet.proxy:")
+                            elif service == "DataMover":
+                                config.write("\n  data.mover:")
+                            elif service == "DNP3Agent":
+                                config.write("\n  dnp3.agent:")
+                            elif service == "ForwardHistorian":
+                                config.write("\n  forward.historian:")
+                            elif service == "IEEE2030_5Agent":
+                                config.write("\n  ieee.agent:")
+                            elif service == "MongodbTaggingService":
+                                config.write("\n  mongodb.tagging:")
+                            elif service == "MQTTHistorian":
+                                config.write("\n  mqtt.historian:")
+                            elif service == "OpenADRVenAgent":
+                                config_file = "config_example1.json"
+                                config.write("\n  openadrven.agent:")
+                            elif service == "PlatformDriverAgent":
+                                config.write("\n  platformdriver.agent:")
+                            elif service == "SQLAggregateHistorian":
+                                config.write("\n  sqlaggregate.historian:")
+                            elif service == "SQLHistorian":
+                                config_file = "config.sqlite"
+                                config.write("\n  sql.historian:")
+                            elif service == "SQLiteTaggingService":
+                                config.write("\n  sqlite.tagging:")
+                            elif service == "VolttronCentral":
+                                config.write("\n  volttron.central:")
+                            elif service == "VolttronCentralPlatform":
+                                config.write("\n  vc.platform:")
+                            elif service == "WeatherDotGov":
+                                config.write("\n  weather.gov:")
+
+                            config.write(f"\n    agent_source: '$VOLTTRON_ROOT/services/core/{service}'")
+                            config.write(f"\n    agent_config: '$VOLTTRON_ROOT/services/core/{service}/{config_file}'")
+                            config.write("\n    agent_running: True")
+                            config.write("\n    agent_enabled: True\n")
+
+                self.send_response(200)
+                self.send_header('Content-type', 'text/html')
+                self.end_headers()
+
+            if self.path == '/install-platform4':
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length).decode('utf-8')
+                picked_services = json.loads(post_data)
+
+                # Get public IP for vip-address
+                temp_socket = socket(AF_INET, SOCK_DGRAM)
+                temp_socket.connect(('8.8.8.8', 80))
+                ip = temp_socket.getsockname()[0]
+                temp_socket.close()
+
+                with open(os.getcwd() + '/localhost4/localhost4.yml', 'w') as config:
+                    config.write("---")
+                    config.write("\nconfig:")
+                    config.write(f"\n  vip-address: tcp://{ip}:22919\n")
+                    config.write("\nagents:")       
+                    for key, value in picked_services.items():
+                        for service in value:
+                            config_file = "config"
+                            if service == "ActuatorAgent":
+                                config.write("\n  actuator.agent:")
+                            elif service == "BACnetProxy":
+                                config.write("\n  bacnet.proxy:")
+                            elif service == "DataMover":
+                                config.write("\n  data.mover:")
+                            elif service == "DNP3Agent":
+                                config.write("\n  dnp3.agent:")
+                            elif service == "ForwardHistorian":
+                                config.write("\n  forward.historian:")
+                            elif service == "IEEE2030_5Agent":
+                                config.write("\n  ieee.agent:")
+                            elif service == "MongodbTaggingService":
+                                config.write("\n  mongodb.tagging:")
+                            elif service == "MQTTHistorian":
+                                config.write("\n  mqtt.historian:")
+                            elif service == "OpenADRVenAgent":
+                                config_file = "config_example1.json"
+                                config.write("\n  openadrven.agent:")
+                            elif service == "PlatformDriverAgent":
+                                config.write("\n  platformdriver.agent:")
+                            elif service == "SQLAggregateHistorian":
+                                config.write("\n  sqlaggregate.historian:")
+                            elif service == "SQLHistorian":
+                                config_file = "config.sqlite"
+                                config.write("\n  sql.historian:")
+                            elif service == "SQLiteTaggingService":
+                                config.write("\n  sqlite.tagging:")
+                            elif service == "VolttronCentral":
+                                config.write("\n  volttron.central:")
+                            elif service == "VolttronCentralPlatform":
+                                config.write("\n  vc.platform:")
+                            elif service == "WeatherDotGov":
+                                config.write("\n  weather.gov:")
+
+                            config.write(f"\n    agent_source: '$VOLTTRON_ROOT/services/core/{service}'")
+                            config.write(f"\n    agent_config: '$VOLTTRON_ROOT/services/core/{service}/{config_file}'")
+                            config.write("\n    agent_running: True")
+                            config.write("\n    agent_enabled: True\n")
+
+                self.send_response(200)
+                self.send_header('Content-type', 'text/html')
+                self.end_headers()
+
+            if self.path == '/install-platform5':
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length).decode('utf-8')
+                picked_services = json.loads(post_data)
+
+                # Get public IP for vip-address
+                temp_socket = socket(AF_INET, SOCK_DGRAM)
+                temp_socket.connect(('8.8.8.8', 80))
+                ip = temp_socket.getsockname()[0]
+                temp_socket.close()
+
+                with open(os.getcwd() + '/localhost5/localhost5.yml', 'w') as config:
+                    config.write("---")
+                    config.write("\nconfig:")
+                    config.write(f"\n  vip-address: tcp://{ip}:22920\n")
+                    config.write("\nagents:")       
+                    for key, value in picked_services.items():
+                        for service in value:
+                            config_file = "config"
+                            if service == "ActuatorAgent":
+                                config.write("\n  actuator.agent:")
+                            elif service == "BACnetProxy":
+                                config.write("\n  bacnet.proxy:")
+                            elif service == "DataMover":
+                                config.write("\n  data.mover:")
+                            elif service == "DNP3Agent":
+                                config.write("\n  dnp3.agent:")
+                            elif service == "ForwardHistorian":
+                                config.write("\n  forward.historian:")
+                            elif service == "IEEE2030_5Agent":
+                                config.write("\n  ieee.agent:")
+                            elif service == "MongodbTaggingService":
+                                config.write("\n  mongodb.tagging:")
+                            elif service == "MQTTHistorian":
+                                config.write("\n  mqtt.historian:")
+                            elif service == "OpenADRVenAgent":
+                                config_file = "config_example1.json"
+                                config.write("\n  openadrven.agent:")
+                            elif service == "PlatformDriverAgent":
+                                config.write("\n  platformdriver.agent:")
+                            elif service == "SQLAggregateHistorian":
+                                config.write("\n  sqlaggregate.historian:")
+                            elif service == "SQLHistorian":
+                                config_file = "config.sqlite"
+                                config.write("\n  sql.historian:")
+                            elif service == "SQLiteTaggingService":
+                                config.write("\n  sqlite.tagging:")
+                            elif service == "VolttronCentral":
+                                config.write("\n  volttron.central:")
+                            elif service == "VolttronCentralPlatform":
+                                config.write("\n  vc.platform:")
+                            elif service == "WeatherDotGov":
+                                config.write("\n  weather.gov:")
+
+                            config.write(f"\n    agent_source: '$VOLTTRON_ROOT/services/core/{service}'")
+                            config.write(f"\n    agent_config: '$VOLTTRON_ROOT/services/core/{service}/{config_file}'")
+                            config.write("\n    agent_running: True")
+                            config.write("\n    agent_enabled: True\n")
+                
+                self.send_response(200)
+                self.send_header('Content-type', 'text/html')
+                self.end_headers()
+
+            # Installs all instances after setup has been completed
+            if self.path == "/install-instances":
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length).decode('utf-8')
+                credentials = parse_qs(post_data)
+    
+                # Assumes correct password is entered first time
+                if not credentials:
+                    self.send_response(200)
+                    self.send_header("Content-type", "application/json")
+                    self.end_headers()
+                    message = {'message': 'Please enter your password'}
+                    self.wfile.write(json.dumps(message).encode())
+                else:
+                    # Set this line back to the original config_file path as it was changed earlier for one instance
+                    set_defaults_filepath = "~/.ansible/collections/ansible_collections/volttron/deployment/roles/set_defaults/tasks/main.yml"
+                    with open(os.path.expanduser(set_defaults_filepath), 'r+') as edit_set_defaults:
+                        lines = edit_set_defaults.readlines()
+
+                        lines[116] = "    deployment_platform_config_file: \"{{ deployment_platform_config_file | default( deployment_host_config_dir + '/' + inventory_hostname + '.yml' ) }}\"\n"
+                        edit_set_defaults.seek(0)
+                        edit_set_defaults.writelines(lines)
+                        edit_set_defaults.truncate()
+
+                    # Use pexpect for password input
+                    host_config_process = pexpect.spawn("ansible-playbook -K -i multiple_instances_inventory.yml --connection=local volttron.deployment.host_config")
+                    host_config_process.expect("BECOME password: ")
+                    host_config_process.sendline(credentials["password"][0])
+                    
+                    host_config_process.expect(pexpect.EOF)
+                    print(host_config_process.before.decode())
+
+                    # Using subprocess for the rest of commands
+                    Popen(['bash', '-c', 'ansible-playbook -i multiple_instances_inventory.yml --connection=local volttron.deployment.install_platform']).wait()
+                    Popen(['bash', '-c', 'ansible-playbook -i multiple_instances_inventory.yml --connection=local volttron.deployment.run_platforms']).wait()
+                    Popen(['bash', '-c', 'ansible-playbook -i multiple_instances_inventory.yml --connection=local volttron.deployment.configure_agents']).wait()
+                    
+                    self.send_response(200)
+                    self.send_header("Content-type", "application/json")
+                    self.end_headers()
+                    message = {'message': f'A total of {num_instances} VOLTTRON instances have been installed and configured'}
+                    self.wfile.write(json.dumps(message).encode())
+                
+                # Start and stop volttron instance for each instance
+            if self.path == "/start-volttron1":
+                Popen(['bash', '-c', 'ansible-playbook -i multiple_instances_inventory.yml -l localhost1 --connection=local volttron.deployment.ad_hoc -e "command=\'volttron -vv -l volttron.log&\'"']).wait()
+                self.send_response(200)
+                self.send_header("Content-type", "application/json")
+                self.end_headers()
+                message = {'message': 'VOLTTRON instance 1 has been started'}
+                self.wfile.write(json.dumps(message).encode())
             
-            # Change to appropriate config file permanently
-            set_defaults_filepath = "~/.ansible/collections/ansible_collections/volttron/deployment/roles/set_defaults/tasks/main.yml"
-            with open(os.path.expanduser(set_defaults_filepath), 'r+') as edit_set_defaults:
-                lines = edit_set_defaults.readlines()
-                lines[116] = "    deployment_platform_config_file: \"{{ deployment_platform_config_file | default( '" + os.getcwd() + "/agent_config.yml' ) }}\"\n"
-                edit_set_defaults.seek(0)
-                edit_set_defaults.writelines(lines)
-                edit_set_defaults.truncate()
+            if self.path == "/start-volttron2":
+                Popen(['bash', '-c', 'ansible-playbook -i multiple_instances_inventory.yml -l localhost2 --connection=local volttron.deployment.ad_hoc -e "command=\'volttron -vv -l volttron.log&\'"']).wait()
+                self.send_response(200)
+                self.send_header("Content-type", "application/json")
+                self.end_headers()
+                message = {'message': 'VOLTTRON instance 2 has been started'}
+                self.wfile.write(json.dumps(message).encode())
             
-            Popen(['bash', '-c', 'ansible-playbook -i localhost, --connection=local volttron.deployment.configure_agents']).wait()
-            self.send_response(200)
-            self.send_header("Content-type", "application/json")
-            self.end_headers()
-            message = {'message': 'Agents have been installed'}
-            self.wfile.write(json.dumps(message).encode())
+            if self.path == "/start-volttron3":
+                Popen(['bash', '-c', 'ansible-playbook -i multiple_instances_inventory.yml -l localhost3 --connection=local volttron.deployment.ad_hoc -e "command=\'volttron -vv -l volttron.log&\'"']).wait()
+                self.send_response(200)
+                self.send_header("Content-type", "application/json")
+                self.end_headers()
+                message = {'message': 'VOLTTRON instance 3 has been started'}
+                self.wfile.write(json.dumps(message).encode())
+            
+            if self.path == "/start-volttron4":
+                Popen(['bash', '-c', 'ansible-playbook -i multiple_instances_inventory.yml -l localhost4 --connection=local volttron.deployment.ad_hoc -e "command=\'volttron -vv -l volttron.log&\'"']).wait()
+                self.send_response(200)
+                self.send_header("Content-type", "application/json")
+                self.end_headers()
+                message = {'message': 'VOLTTRON instance 4 has been started'}
+                self.wfile.write(json.dumps(message).encode())
+            
+            if self.path == "/start-volttron5":
+                Popen(['bash', '-c', 'ansible-playbook -i multiple_instances_inventory.yml -l localhost5 --connection=local volttron.deployment.ad_hoc -e "command=\'volttron -vv -l volttron.log&\'"']).wait()
+                self.send_response(200)
+                self.send_header("Content-type", "application/json")
+                self.end_headers()
+                message = {'message': 'VOLTTRON instance 5 has been started'}
+                self.wfile.write(json.dumps(message).encode())
+            if self.path == "/stop-volttron1":
+                Popen(['bash', '-c', 'ansible-playbook -i multiple_instances_inventory.yml -l localhost1 --connection=local volttron.deployment.ad_hoc -e "command=\'vctl shutdown --platform\'"']).wait()
+                self.send_response(200)
+                self.send_header("Content-type", "application/json")
+                self.end_headers()
+                message = {'message': 'VOLTTRON instance 1 has been stopped'}
+                self.wfile.write(json.dumps(message).encode())
+            
+            if self.path == "/stop-volttron2":
+                Popen(['bash', '-c', 'ansible-playbook -i multiple_instances_inventory.yml -l localhost2 --connection=local volttron.deployment.ad_hoc -e "command=\'vctl shutdown --platform\'"']).wait()
+                self.send_response(200)
+                self.send_header("Content-type", "application/json")
+                self.end_headers()
+                message = {'message': 'VOLTTRON instance 2 has been stopped'}
+                self.wfile.write(json.dumps(message).encode())
+            
+            if self.path == "/stop-volttron3":
+                Popen(['bash', '-c', 'ansible-playbook -i multiple_instances_inventory.yml -l localhost3 --connection=local volttron.deployment.ad_hoc -e "command=\'vctl shutdown --platform\'"']).wait()
+                self.send_response(200)
+                self.send_header("Content-type", "application/json")
+                self.end_headers()
+                message = {'message': 'VOLTTRON instance 3 has been stopped'}
+                self.wfile.write(json.dumps(message).encode())
+            
+            if self.path == "/stop-volttron4":
+                Popen(['bash', '-c', 'ansible-playbook -i multiple_instances_inventory.yml -l localhost4 --connection=local volttron.deployment.ad_hoc -e "command=\'vctl shutdown --platform\'"']).wait()
+                self.send_response(200)
+                self.send_header("Content-type", "application/json")
+                self.end_headers()
+                message = {'message': 'VOLTTRON instance 4 has been stopped'}
+                self.wfile.write(json.dumps(message).encode())
+            
+            if self.path == "/stop-volttron5":
+                Popen(['bash', '-c', 'ansible-playbook -i multiple_instances_inventory.yml -l localhost5 --connection=local volttron.deployment.ad_hoc -e "command=\'vctl shutdown --platform\'"']).wait()
+                self.send_response(200)
+                self.send_header("Content-type", "application/json")
+                self.end_headers()
+                message = {'message': 'VOLTTRON instance 5 has been stopped'}
+                self.wfile.write(json.dumps(message).encode())
 
-        # Create config files for each instance
-        if self.path == "/install-platform1":
-            content_length = int(self.headers['Content-Length'])
-            post_data = self.rfile.read(content_length).decode('utf-8')
-            picked_services = json.loads(post_data)
-
-            # Get public IP for vip-address
-            temp_socket = socket(AF_INET, SOCK_DGRAM)
-            temp_socket.connect(('8.8.8.8', 80))
-            ip = temp_socket.getsockname()[0]
-            temp_socket.close()
-
-            with open(os.getcwd() + '/localhost1/localhost1.yml', 'w') as config:
-                config.write("---")
-                config.write("\nconfig:")
-                config.write(f"\n  vip-address: tcp://{ip}:22916\n")
-                config.write("\nagents:")       
-                for key, value in picked_services.items():
-                    for service in value:
-                        config_file = "config"
-                        if service == "ActuatorAgent":
-                            config.write("\n  actuator.agent:")
-                        elif service == "BACnetProxy":
-                            config.write("\n  bacnet.proxy:")
-                        elif service == "DataMover":
-                            config.write("\n  data.mover:")
-                        elif service == "DNP3Agent":
-                            config.write("\n  dnp3.agent:")
-                        elif service == "ForwardHistorian":
-                            config.write("\n  forward.historian:")
-                        elif service == "IEEE2030_5Agent":
-                            config.write("\n  ieee.agent:")
-                        elif service == "MongodbTaggingService":
-                            config.write("\n  mongodb.tagging:")
-                        elif service == "MQTTHistorian":
-                            config.write("\n  mqtt.historian:")
-                        elif service == "OpenADRVenAgent":
-                            config_file = "config_example1.json"
-                            config.write("\n  openadrven.agent:")
-                        elif service == "PlatformDriverAgent":
-                            config.write("\n  platformdriver.agent:")
-                        elif service == "SQLAggregateHistorian":
-                            config.write("\n  sqlaggregate.historian:")
-                        elif service == "SQLHistorian":
-                            config_file = "config.sqlite"
-                            config.write("\n  sql.historian:")
-                        elif service == "SQLiteTaggingService":
-                            config.write("\n  sqlite.tagging:")
-                        elif service == "VolttronCentral":
-                            config.write("\n  volttron.central:")
-                        elif service == "VolttronCentralPlatform":
-                            config.write("\n  vc.platform:")
-                        elif service == "WeatherDotGov":
-                            config.write("\n  weather.gov:")
-
-                        config.write(f"\n    agent_source: '$VOLTTRON_ROOT/services/core/{service}'")
-                        config.write(f"\n    agent_config: '$VOLTTRON_ROOT/services/core/{service}/{config_file}'")
-                        config.write("\n    agent_running: True")
-                        config.write("\n    agent_enabled: True\n")
-                
-            self.send_response(200)
-            self.send_header('Content-type', 'text/html')
-            self.end_headers()
-
-        if self.path == '/install-platform2':
-            content_length = int(self.headers['Content-Length'])
-            post_data = self.rfile.read(content_length).decode('utf-8')
-            picked_services = json.loads(post_data)
-
-            # Get public IP for vip-address
-            temp_socket = socket(AF_INET, SOCK_DGRAM)
-            temp_socket.connect(('8.8.8.8', 80))
-            ip = temp_socket.getsockname()[0]
-            temp_socket.close()
-        
-            with open(os.getcwd() + '/localhost2/localhost2.yml', 'w') as config:
-                config.write("---")
-                config.write("\nconfig:")
-                config.write(f"\n  vip-address: tcp://{ip}:22917\n")
-                config.write("\nagents:")       
-                for key, value in picked_services.items():
-                    for service in value:
-                        config_file = "config"
-                        if service == "ActuatorAgent":
-                            config.write("\n  actuator.agent:")
-                        elif service == "BACnetProxy":
-                            config.write("\n  bacnet.proxy:")
-                        elif service == "DataMover":
-                            config.write("\n  data.mover:")
-                        elif service == "DNP3Agent":
-                            config.write("\n  dnp3.agent:")
-                        elif service == "ForwardHistorian":
-                            config.write("\n  forward.historian:")
-                        elif service == "IEEE2030_5Agent":
-                            config.write("\n  ieee.agent:")
-                        elif service == "MongodbTaggingService":
-                            config.write("\n  mongodb.tagging:")
-                        elif service == "MQTTHistorian":
-                            config.write("\n  mqtt.historian:")
-                        elif service == "OpenADRVenAgent":
-                            config_file = "config_example1.json"
-                            config.write("\n  openadrven.agent:")
-                        elif service == "PlatformDriverAgent":
-                            config.write("\n  platformdriver.agent:")
-                        elif service == "SQLAggregateHistorian":
-                            config.write("\n  sqlaggregate.historian:")
-                        elif service == "SQLHistorian":
-                            config_file = "config.sqlite"
-                            config.write("\n  sql.historian:")
-                        elif service == "SQLiteTaggingService":
-                            config.write("\n  sqlite.tagging:")
-                        elif service == "VolttronCentral":
-                            config.write("\n  volttron.central:")
-                        elif service == "VolttronCentralPlatform":
-                            config.write("\n  vc.platform:")
-                        elif service == "WeatherDotGov":
-                            config.write("\n  weather.gov:")
-
-                        config.write(f"\n    agent_source: '$VOLTTRON_ROOT/services/core/{service}'")
-                        config.write(f"\n    agent_config: '$VOLTTRON_ROOT/services/core/{service}/{config_file}'")
-                        config.write("\n    agent_running: True")
-                        config.write("\n    agent_enabled: True\n")
-                
-            self.send_response(200)
-            self.send_header('Content-type', 'text/html')
-            self.end_headers()
-
-        if self.path == '/install-platform3':
-            content_length = int(self.headers['Content-Length'])
-            post_data = self.rfile.read(content_length).decode('utf-8')
-            picked_services = json.loads(post_data)
-
-            # Get public IP for vip-address
-            temp_socket = socket(AF_INET, SOCK_DGRAM)
-            temp_socket.connect(('8.8.8.8', 80))
-            ip = temp_socket.getsockname()[0]
-            temp_socket.close()
-        
-            with open(os.getcwd() + '/localhost3/localhost3.yml', 'w') as config:
-                config.write("---")
-                config.write("\nconfig:")
-                config.write(f"\n  vip-address: tcp://{ip}:22918\n")
-                config.write("\nagents:")       
-                for key, value in picked_services.items():
-                    for service in value:
-                        config_file = "config"
-                        if service == "ActuatorAgent":
-                            config.write("\n  actuator.agent:")
-                        elif service == "BACnetProxy":
-                            config.write("\n  bacnet.proxy:")
-                        elif service == "DataMover":
-                            config.write("\n  data.mover:")
-                        elif service == "DNP3Agent":
-                            config.write("\n  dnp3.agent:")
-                        elif service == "ForwardHistorian":
-                            config.write("\n  forward.historian:")
-                        elif service == "IEEE2030_5Agent":
-                            config.write("\n  ieee.agent:")
-                        elif service == "MongodbTaggingService":
-                            config.write("\n  mongodb.tagging:")
-                        elif service == "MQTTHistorian":
-                            config.write("\n  mqtt.historian:")
-                        elif service == "OpenADRVenAgent":
-                            config_file = "config_example1.json"
-                            config.write("\n  openadrven.agent:")
-                        elif service == "PlatformDriverAgent":
-                            config.write("\n  platformdriver.agent:")
-                        elif service == "SQLAggregateHistorian":
-                            config.write("\n  sqlaggregate.historian:")
-                        elif service == "SQLHistorian":
-                            config_file = "config.sqlite"
-                            config.write("\n  sql.historian:")
-                        elif service == "SQLiteTaggingService":
-                            config.write("\n  sqlite.tagging:")
-                        elif service == "VolttronCentral":
-                            config.write("\n  volttron.central:")
-                        elif service == "VolttronCentralPlatform":
-                            config.write("\n  vc.platform:")
-                        elif service == "WeatherDotGov":
-                            config.write("\n  weather.gov:")
-
-                        config.write(f"\n    agent_source: '$VOLTTRON_ROOT/services/core/{service}'")
-                        config.write(f"\n    agent_config: '$VOLTTRON_ROOT/services/core/{service}/{config_file}'")
-                        config.write("\n    agent_running: True")
-                        config.write("\n    agent_enabled: True\n")
-                
-            self.send_response(200)
-            self.send_header('Content-type', 'text/html')
-            self.end_headers()
-
-        if self.path == '/install-platform4':
-            content_length = int(self.headers['Content-Length'])
-            post_data = self.rfile.read(content_length).decode('utf-8')
-            picked_services = json.loads(post_data)
-
-            # Get public IP for vip-address
-            temp_socket = socket(AF_INET, SOCK_DGRAM)
-            temp_socket.connect(('8.8.8.8', 80))
-            ip = temp_socket.getsockname()[0]
-            temp_socket.close()
-        
-            with open(os.getcwd() + '/localhost4/localhost4.yml', 'w') as config:
-                config.write("---")
-                config.write("\nconfig:")
-                config.write(f"\n  vip-address: tcp://{ip}:22919\n")
-                config.write("\nagents:")       
-                for key, value in picked_services.items():
-                    for service in value:
-                        config_file = "config"
-                        if service == "ActuatorAgent":
-                            config.write("\n  actuator.agent:")
-                        elif service == "BACnetProxy":
-                            config.write("\n  bacnet.proxy:")
-                        elif service == "DataMover":
-                            config.write("\n  data.mover:")
-                        elif service == "DNP3Agent":
-                            config.write("\n  dnp3.agent:")
-                        elif service == "ForwardHistorian":
-                            config.write("\n  forward.historian:")
-                        elif service == "IEEE2030_5Agent":
-                            config.write("\n  ieee.agent:")
-                        elif service == "MongodbTaggingService":
-                            config.write("\n  mongodb.tagging:")
-                        elif service == "MQTTHistorian":
-                            config.write("\n  mqtt.historian:")
-                        elif service == "OpenADRVenAgent":
-                            config_file = "config_example1.json"
-                            config.write("\n  openadrven.agent:")
-                        elif service == "PlatformDriverAgent":
-                            config.write("\n  platformdriver.agent:")
-                        elif service == "SQLAggregateHistorian":
-                            config.write("\n  sqlaggregate.historian:")
-                        elif service == "SQLHistorian":
-                            config_file = "config.sqlite"
-                            config.write("\n  sql.historian:")
-                        elif service == "SQLiteTaggingService":
-                            config.write("\n  sqlite.tagging:")
-                        elif service == "VolttronCentral":
-                            config.write("\n  volttron.central:")
-                        elif service == "VolttronCentralPlatform":
-                            config.write("\n  vc.platform:")
-                        elif service == "WeatherDotGov":
-                            config.write("\n  weather.gov:")
-
-                        config.write(f"\n    agent_source: '$VOLTTRON_ROOT/services/core/{service}'")
-                        config.write(f"\n    agent_config: '$VOLTTRON_ROOT/services/core/{service}/{config_file}'")
-                        config.write("\n    agent_running: True")
-                        config.write("\n    agent_enabled: True\n")
-                
-            self.send_response(200)
-            self.send_header('Content-type', 'text/html')
-            self.end_headers()
-
-        if self.path == '/install-platform5':
-            content_length = int(self.headers['Content-Length'])
-            post_data = self.rfile.read(content_length).decode('utf-8')
-            picked_services = json.loads(post_data)
-
-            # Get public IP for vip-address
-            temp_socket = socket(AF_INET, SOCK_DGRAM)
-            temp_socket.connect(('8.8.8.8', 80))
-            ip = temp_socket.getsockname()[0]
-            temp_socket.close()
-        
-            with open(os.getcwd() + '/localhost5/localhost5.yml', 'w') as config:
-                config.write("---")
-                config.write("\nconfig:")
-                config.write(f"\n  vip-address: tcp://{ip}:22920\n")
-                config.write("\nagents:")       
-                for key, value in picked_services.items():
-                    for service in value:
-                        config_file = "config"
-                        if service == "ActuatorAgent":
-                            config.write("\n  actuator.agent:")
-                        elif service == "BACnetProxy":
-                            config.write("\n  bacnet.proxy:")
-                        elif service == "DataMover":
-                            config.write("\n  data.mover:")
-                        elif service == "DNP3Agent":
-                            config.write("\n  dnp3.agent:")
-                        elif service == "ForwardHistorian":
-                            config.write("\n  forward.historian:")
-                        elif service == "IEEE2030_5Agent":
-                            config.write("\n  ieee.agent:")
-                        elif service == "MongodbTaggingService":
-                            config.write("\n  mongodb.tagging:")
-                        elif service == "MQTTHistorian":
-                            config.write("\n  mqtt.historian:")
-                        elif service == "OpenADRVenAgent":
-                            config_file = "config_example1.json"
-                            config.write("\n  openadrven.agent:")
-                        elif service == "PlatformDriverAgent":
-                            config.write("\n  platformdriver.agent:")
-                        elif service == "SQLAggregateHistorian":
-                            config.write("\n  sqlaggregate.historian:")
-                        elif service == "SQLHistorian":
-                            config_file = "config.sqlite"
-                            config.write("\n  sql.historian:")
-                        elif service == "SQLiteTaggingService":
-                            config.write("\n  sqlite.tagging:")
-                        elif service == "VolttronCentral":
-                            config.write("\n  volttron.central:")
-                        elif service == "VolttronCentralPlatform":
-                            config.write("\n  vc.platform:")
-                        elif service == "WeatherDotGov":
-                            config.write("\n  weather.gov:")
-
-                        config.write(f"\n    agent_source: '$VOLTTRON_ROOT/services/core/{service}'")
-                        config.write(f"\n    agent_config: '$VOLTTRON_ROOT/services/core/{service}/{config_file}'")
-                        config.write("\n    agent_running: True")
-                        config.write("\n    agent_enabled: True\n")
-                
-            self.send_response(200)
-            self.send_header('Content-type', 'text/html')
-            self.end_headers()
-        
-        # Start and stop volttron instance (only for 1 instance currently)
-        if self.path == "/start-volttron":
-            Popen(['bash', '-c', 'cd ~/volttron && ./start-volttron']).wait()
-
-            self.send_response(200)
-            self.send_header("Content-type", "application/json")
-            self.end_headers()
-            message = {'message': 'VOLTTRON has been started'}
-            self.wfile.write(json.dumps(message).encode())
-        
-        if self.path == "/stop-volttron":
-            Popen(['bash', '-c', 'cd ~/volttron && ./stop-volttron']).wait()
-
-            self.send_response(200)
-            self.send_header("Content-type", "application/json")
-            self.end_headers()
-            message = {'message': 'VOLTTRON has been stopped'}
-            self.wfile.write(json.dumps(message).encode())
-
-   
 # Start web server and open default browser pointed to "http://localhost:8080"; Server only gets closed after KeyboardInterrupt
 if __name__ =="__main__":
     print("Now starting local web server.")
