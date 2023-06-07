@@ -253,7 +253,7 @@ class myServer(BaseHTTPRequestHandler):
                     <input type="checkbox" id="agent16" name="checkbox_instance_{count}" value="WeatherDotGov">
                     <label for="agent16"> Weather Dot Gov</label>
                     <br>
-                    <input type="submit" value="Install Instance {count}" form="form{count}">
+                    <input type="submit" value="Configure Instance {count}" form="form{count}">
                 </form>
                 <form onsubmit="event.preventDefault(); startVOLTTRON{count}();" enctype="application/x-www-form-urlencoded" id="start_form{count}">
                     <input type="submit" value="Start VOLTTRON Instance {count}" form="start_form{count}">
