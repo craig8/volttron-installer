@@ -1,13 +1,11 @@
 from dataclasses import dataclass, field
-from typing import Optional, List, Type, Dict
-from urllib.parse import urlparse
+from typing import Optional, List
 from enum import Enum
 from multiprocessing import Manager, Queue
 from concurrent.futures import ProcessPoolExecutor
 
 import asyncio
 import json
-import time
 
 from nicegui import ui
 
@@ -15,6 +13,7 @@ pool = ProcessPoolExecutor()
 
 # Create Enum's for each attribute of agent with defaults (used for easy mapping and data modification)
 class AgentName(Enum):
+    '''Enum of Agent Names'''
     NAME_ACTUATOR = "Actuator Agent"
     NAME_BACNET = "BACnet Proxy"
     NAME_DATA_MOVER = "Data Mover"
@@ -33,6 +32,7 @@ class AgentName(Enum):
     NAME_WEATHER_DOT_GOV = "Weather Dot Gov"
 
 class AgentIdentity(Enum):
+    '''Enum of Agent Identities'''
     ID_ACTUATOR = "platform.actuator"
     ID_BACNET = "platform.bacnet_proxy"
     ID_DATA_MOVER = "platform.datamover"
@@ -50,26 +50,28 @@ class AgentIdentity(Enum):
     ID_VOLTTRON_CENTRAL_PLATFORM = "platform.agent"
     ID_WEATHER_DOT_GOV = "platform.weatherdotgov"
 
-source_path = "services/core/"
+SOURCE_PATH = "services/core/"
 class AgentSource(Enum):
-    SOURCE_ACTUATOR = source_path + "ActuatorAgent"
-    SOURCE_BACNET = source_path + "BACnetProxy"
-    SOURCE_DATAMOVER = source_path + "DataMover"
-    SOURCE_DNP3 = source_path + "DNP3Agent"
-    SOURCE_FORWARDHIST = source_path + "ForwardHistorian"
-    SOURCE_IEEE = source_path + "IEEE2030_5Agent"
-    SOURCE_MONGODB = source_path + "MongodbTaggingService"
-    SOURCE_MQTTHIST = source_path + "MQTTHistorian"
-    SOURCE_OPENADR = source_path + "OpenADRVenAgent"
-    SOURCE_PLATFORMDRIVER = source_path + "PlatformDriverAgent"
-    SOURCE_SQLAGG = source_path + "SQLAggregateHistorian"
-    SOURCE_SQL = source_path + "SQLHistorian"
-    SOURCE_SQLITE = source_path + "SQLiteTaggingService"
-    SOURCE_VC = source_path + "VolttronCentral"
-    SOURCE_VCPLATFORM = source_path + "VolttronCentralPlatform"
-    SOURCE_WEATHERDOTGOV = source_path + "WeatherDotGov"
+    '''Enum of Agent Sources'''
+    SOURCE_ACTUATOR = SOURCE_PATH + "ActuatorAgent"
+    SOURCE_BACNET = SOURCE_PATH + "BACnetProxy"
+    SOURCE_DATAMOVER = SOURCE_PATH + "DataMover"
+    SOURCE_DNP3 = SOURCE_PATH + "DNP3Agent"
+    SOURCE_FORWARDHIST = SOURCE_PATH + "ForwardHistorian"
+    SOURCE_IEEE = SOURCE_PATH + "IEEE2030_5Agent"
+    SOURCE_MONGODB = SOURCE_PATH + "MongodbTaggingService"
+    SOURCE_MQTTHIST = SOURCE_PATH + "MQTTHistorian"
+    SOURCE_OPENADR = SOURCE_PATH + "OpenADRVenAgent"
+    SOURCE_PLATFORMDRIVER = SOURCE_PATH + "PlatformDriverAgent"
+    SOURCE_SQLAGG = SOURCE_PATH + "SQLAggregateHistorian"
+    SOURCE_SQL = SOURCE_PATH + "SQLHistorian"
+    SOURCE_SQLITE = SOURCE_PATH + "SQLiteTaggingService"
+    SOURCE_VC = SOURCE_PATH + "VolttronCentral"
+    SOURCE_VCPLATFORM = SOURCE_PATH + "VolttronCentralPlatform"
+    SOURCE_WEATHERDOTGOV = SOURCE_PATH + "WeatherDotGov"
 
 class AgentConfig(Enum):
+    '''Enum of Agent Configs'''
     CONFIG_ACTUATOR = {
         "schedule_publish_interval": 30,
         "schedule_state_file": "actuator_state.pickle"
@@ -231,74 +233,49 @@ class AgentConfig(Enum):
         "poll_interval": 60
     }
 
-# Class for agents
 @dataclass
 class Agent:
+    '''Class for Agents'''
     name: str
     identity: str
     source: str
     config: Optional[dict] = None
 
-# Class for platform
 @dataclass
 class Platform:
+    '''Class for Platform'''
     name: str = "volttron"
     vip_address: Optional[str] = "tcp://127.0.0.1:22916"
     bind_web_address: Optional[str] = None
     agents: List[Agent] = field(default_factory=[])
 
 
-# Create list and dicts to hold values for specific agents; used for modification of platform/frontend
+# Create list and dicts to hold specific values for agents; used for modification of platform/frontend
 agent_name_list = []
 agent_identity_dict = {}
 agent_config_dict = {}
 
 for count in range(len(list(AgentName))):
-    picked_agent = Agent(
-        list(AgentName)[count].value,
-        list(AgentIdentity)[count].value,
-        list(AgentSource)[count].value,
-        list(AgentConfig)[count].value
-        )
     agent_name_list.append(list(AgentName)[count].value)
-
     agent_identity_dict[list(AgentName)[count].value] = list(AgentIdentity)[count].value
     agent_config_dict[list(AgentName)[count].value] = str(list(AgentConfig)[count].value)
 
+def install_platform(q: Queue):
+    '''Installs platform and updates progress bar as processes are finished'''
+    print("hello")
 
+    # Update the progress bar through the queue
+    q.put_nowait(75)
 
-
-'''PROGRESS BAR'''
-#def install_platform(q: Queue):
-#    n = 50
-#    for i in range(n):
-#        # Perform some heavy computation
-#        time.sleep(0.1)
-#
-#        # Update the progress bar through the queue
-#        q.put_nowait(i / n)
-
-def setup_platform(name: str, address: str,  table: List[dict], web_address: Optional[str] = None):
-    '''TRYING TO GET PROGRESS BAR TO WORK'''
-    #async def start_installation():
-    #    loop = asyncio.get_running_loop()
-    #    
-    #    await loop.run_in_executor(pool, install_platform, queue)
-    #
-    #queue = Manager().Queue()
-    #
-    #ui.timer(0.1, callback=lambda: progressbar.set_value(queue.get() if not queue.empty() else progressbar.value))
-#
-    #progressbar = ui.linear_progress(value=0).props('instant-feedback')
-    
-
+# Sets up everything needed to install VOLTTRON based on what was entered 
+def setup_platform(name: str, address: str,  table: List[dict], web_address: Optional[str] = None):    
     # Add sources to selected agents, create objects of those agents, append those objects to a list
     agent_list = []
-    count = 0
-    for count in range(0, 16):
+    num = 0
+    for num in range(0, 16):
         for agent in table:
-            if list(AgentName)[count].value in agent.values():
-                agent["source"] = list(AgentSource)[count].value
+            if list(AgentName)[num].value in agent.values():
+                agent["source"] = list(AgentSource)[num].value
                 config = agent["config"].replace("'", "\"") # Change single quotes to double so str can be converted to dict
                 picked_agent = Agent(
                     name=agent["name"],
@@ -307,7 +284,7 @@ def setup_platform(name: str, address: str,  table: List[dict], web_address: Opt
                     config=json.loads(config) # json.loads() because config was a string for frontend display
                 )
                 agent_list.append(picked_agent)
-        count += 1
+        num += 1
 
     # Object for platform
     platform = Platform(name=name, vip_address=address, bind_web_address=web_address, agents=agent_list)
@@ -325,8 +302,8 @@ columns = [
 ]
 rows = []
 
-# Add header
 def add_header():
+    '''Add header'''
     header_items = {
         'Home': '/',
         'Create': '/create',
@@ -337,24 +314,33 @@ def add_header():
             for title, target in header_items.items():
                 ui.link(title, target).classes(replace="text-lg text-white")
 
-# Updates the values for identity and config input based on which agent was picked
 def update_choice(new_name, new_id, new_config): # Pass through objects
-    # Update values on obj's
+    '''Updates the values for identity and config input based on which agent was picked'''
     new_id.value = agent_identity_dict[new_name.value]
     new_config.value = str(agent_config_dict[new_name.value])
 
     new_id.update()
     new_config.update()
 
-def confirm_platform(platform_name, vip_address, agent_table, web_address_checkbox): # Pass through objects
+def confirm_platform(platform_name, vip_address, table, web_address_checkbox): # Pass through objects
+    '''Shows what the user has chosen and can be submitted'''
     # Update values on all obj's
     platform_name.update()
     vip_address.update()
-    agent_table.update()
+    table.update()
     web_address_checkbox.update()
 
     # Declare web address
     web_address = vip_address.value.replace(vip_address.value.split("://")[0], "http")
+
+    # Async even handler; Will install platform
+    async def start_installation():
+        progress.visible = True
+        loop = asyncio.get_running_loop()
+
+        await loop.run_in_executor(pool, install_platform, queue)
+
+    queue = Manager().Queue()
 
     # Input web address if checkbox was clicked
     with ui.dialog() as dialog, ui.card():
@@ -376,14 +362,18 @@ def confirm_platform(platform_name, vip_address, agent_table, web_address_checkb
             pass
 
         with ui.row():
-            ui.table(title='Agents', columns=columns, rows=agent_table.rows)
+            ui.table(title='Agents', columns=columns, rows=table.rows)
         with ui.row():
             ui.button("Cancel", on_click=dialog.close)
-            ui.button("Confirm", on_click=lambda: (setup_platform(platform_name.value, vip_address.value, agent_table.rows, web_address), dialog.close))
-    dialog.open()        
+            ui.button("Confirm", on_click=start_installation)
+            progress = ui.circular_progress(min=0, max=100, value=0, size="xl").props('instant-feedback')
+            progress.visible = False
+            
+        ui.timer(0.1, callback=lambda: progress.set_value(queue.get() if not queue.empty() else progress.value))
+    dialog.open()
 
-# Table for selecting agents
 def agent_table():
+    '''Table for selecting agents'''
     ui.label("Pick your agent and overwrite the default configuration/identity if needed")
     with ui.table(title='Agents', columns=columns, rows=rows, row_key='name', selection='multiple').classes('w-75') as table:
         with table.add_slot('header'):
@@ -408,8 +398,8 @@ def agent_table():
     
     return table
 
-# Platform name, vip-address, and table for agents; option to make vip-address bind-web-address as well
 def output_data():
+    '''Platform name, vip-address, and table for agents; option to make vip-address the bind-web-address as well'''
     add_header()
     ui.label("Create Platform").style("font-size: 26px")
 
@@ -442,4 +432,4 @@ def create():
 def howto():
     add_header()
     
-ui.run()
+ui.run(title="VOLTTRON")
