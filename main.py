@@ -3,9 +3,11 @@ from typing import Optional, List
 from enum import Enum
 from multiprocessing import Manager, Queue
 from concurrent.futures import ProcessPoolExecutor
+from subprocess import Popen, PIPE
 
 import asyncio
 import json
+import os
 
 from nicegui import ui
 
@@ -50,7 +52,7 @@ class AgentIdentity(Enum):
     ID_VOLTTRON_CENTRAL_PLATFORM = "platform.agent"
     ID_WEATHER_DOT_GOV = "platform.weatherdotgov"
 
-SOURCE_PATH = "services/core/"
+SOURCE_PATH = "$VOLTTRON_ROOT/services/core/"
 class AgentSource(Enum):
     '''Enum of Agent Sources'''
     SOURCE_ACTUATOR = SOURCE_PATH + "ActuatorAgent"
@@ -260,16 +262,16 @@ for count in range(len(list(AgentName))):
     agent_identity_dict[list(AgentName)[count].value] = list(AgentIdentity)[count].value
     agent_config_dict[list(AgentName)[count].value] = str(list(AgentConfig)[count].value)
 
-def install_platform(q: Queue):
+def install_platform(q: Queue, name: str, address: str,  table: List[dict], web_address: Optional[str] = None):
+    platform = setup_platform(name, address, table, web_address)
     '''Installs platform and updates progress bar as processes are finished'''
-    print("hello")
 
     # Update the progress bar through the queue
     q.put_nowait(75)
 
 # Sets up everything needed to install VOLTTRON based on what was entered 
 def setup_platform(name: str, address: str,  table: List[dict], web_address: Optional[str] = None):    
-    # Add sources to selected agents, create objects of those agents, append those objects to a list
+    '''Add sources to selected agents, create objects of those agents, append those objects to a list'''
     agent_list = []
     num = 0
     for num in range(0, 16):
@@ -288,10 +290,32 @@ def setup_platform(name: str, address: str,  table: List[dict], web_address: Opt
 
     # Object for platform
     platform = Platform(name=name, vip_address=address, bind_web_address=web_address, agents=agent_list)
-    print(platform.name)
-    print(platform.vip_address)
-    print(platform.bind_web_address)
-    print(platform.agents)
+
+    Popen(['bash', '-c', f'mkdir -p {platform.name}']).wait()
+
+    # Create inventory file for all instances after web server has been opened
+    with open(os.getcwd() + "/inventory.yml", "w") as inventory:
+        inventory.write("---")
+        inventory.write("\nall:")
+        inventory.write("\n  hosts:")
+        inventory.write(f'\n    {platform.name}:') # Change later
+        inventory.write(f'\n      volttron_home: "~/{platform.name}"')
+    
+    with open(os.getcwd() + f'/{platform.name}/{platform.name}.yml', 'w') as config:
+        config.write("---")
+        config.write("\nconfig:")
+        config.write(f'\n  vip-address: {platform.vip_address}\n')
+        if platform.bind_web_address is not None:
+            config.write(f'\n  bind-web-address: {platform.bind_web_address}')
+        config.write("\nagents:")
+        for agent in platform.agents:
+            config.write(f'\n  {agent.identity}:')
+            config.write(f'\n    agent_source: {agent.source}')
+            config.write(f'\n    agent_config: {agent.config}')
+            config.write("\n    agent_running: True")
+            config.write("\n    agent_enabled: True\n")
+    
+    return platform
 
 # --------------------------------------------- WEB SIDE ---------------------------------------------
 # Columns and rows for table
@@ -333,12 +357,16 @@ def confirm_platform(platform_name, vip_address, table, web_address_checkbox): #
     # Declare web address
     web_address = vip_address.value.replace(vip_address.value.split("://")[0], "http")
 
-    # Async even handler; Will install platform
     async def start_installation():
+        '''Async event handler; Will install platform'''
         progress.visible = True
         loop = asyncio.get_running_loop()
 
-        await loop.run_in_executor(pool, install_platform, queue)
+        if web_address_checkbox is True:
+            await loop.run_in_executor(pool, install_platform, queue, platform_name.value, vip_address.value, table.rows, web_address.value)
+        else:
+            await loop.run_in_executor(pool, install_platform, queue, platform_name.value, vip_address.value, table.rows)
+
 
     queue = Manager().Queue()
 
