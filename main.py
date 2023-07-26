@@ -4,12 +4,12 @@ from enum import Enum
 from multiprocessing import Manager, Queue
 from concurrent.futures import ProcessPoolExecutor
 from subprocess import Popen, PIPE
+from yaml import dump, safe_load
 
 import asyncio
-import json
 import os
 
-from nicegui import ui
+from nicegui import app, ui
 
 pool = ProcessPoolExecutor()
 
@@ -241,7 +241,7 @@ class Agent:
     name: str
     identity: str
     source: str
-    config: Optional[dict] = None
+    config: Optional[str] = None
 
 @dataclass
 class Platform:
@@ -251,7 +251,50 @@ class Platform:
     bind_web_address: Optional[str] = None
     agents: List[Agent] = field(default_factory=[])
 
+    def write_platform_config(self, filename: str):
+        if self.bind_web_address is not None:
+            plat_dict = {
+                "config": {
+                    "vip_address": self.vip_address,
+                    "bind_web_address": self.bind_web_address
+                }
+            }
+        else:
+            plat_dict = {
+                "config": {
+                    "vip_address": self.vip_address,
+                }
+            }
+        
+        for agent in self.agents:
+            plat_dict.update({
+                agent.identity: {
+                    "agent_source": agent.source,
+                    "agent_config": agent.config,
+                    "agent_running": True,
+                    "agent_enabled": True
+                }
+            })
+            
+@dataclass
+class Inventory:
+    '''Class to Create and Read Inventory; Currently meant for one platform, will expand later'''
+    host: str
 
+    def write_inventory(self, filename: str):
+        inv_dict = {
+            "all": {
+                "hosts": {
+                    self.host: {
+                        "ansible_host": "localhost"
+                    }
+                }
+            }
+        }
+        
+        with open(os.path.expanduser("~") + f"/.volttron_installer/{filename}", 'w') as inventory:
+            dump(inv_dict, inventory)
+ 
 # Create list and dicts to hold specific values for agents; used for modification of platform/frontend
 agent_name_list = []
 agent_identity_dict = {}
@@ -262,58 +305,101 @@ for count in range(len(list(AgentName))):
     agent_identity_dict[list(AgentName)[count].value] = list(AgentIdentity)[count].value
     agent_config_dict[list(AgentName)[count].value] = str(list(AgentConfig)[count].value)
 
-def install_platform(q: Queue, name: str, address: str,  table: List[dict], web_address: Optional[str] = None):
-    platform = setup_platform(name, address, table, web_address)
+import pexpect # Move import when code is more finished
+def install_platform(q: Queue, name: str, vip_address: str,  table: List[dict], password: str, web_address: Optional[str] = None):
     '''Installs platform and updates progress bar as processes are finished'''
+    platform = setup_platform(name, vip_address, table, web_address)
+    q.put_nowait(20) # Update progress bar
 
-    # Update the progress bar through the queue
-    q.put_nowait(75)
+    ## Host Configuration; handles password input; Assumes password was entered correctly
+    #host_config_process = pexpect.spawn("ansible-playbook -K -i inventory.yml --connection=local volttron.deployment.host_config")
+    #host_config_process.expect("BECOME password: ")
+    #host_config_process.sendline(password)
+#
+    #host_config_process.expect(pexpect.EOF)
+    #print(host_config_process.before.decode())
+    #q.put_nowait(40)
+#
+    ## Install Platform
+    #install_cmd = Popen(['bash', '-c', 'ansible-playbook -i inventory.yml --connection=local volttron.deployment.install_platform'], stdout=PIPE, stderr=PIPE)
+    #stdout, stderr = install_cmd.communicate()
+#
+    #if stdout is not None:
+    #    stdout_str = stdout.decode('utf-8')
+    #    print(stdout_str)
+    #if stderr is not None:
+    #    stderr_str = stderr.decode('utf-8')
+    #    print(stderr_str)
+#
+    #q.put_nowait(60)
+#
+    ## Run Platform
+    #run = Popen(['bash', '-c', 'ansible-playbook -i inventory.yml --connection=local volttron.deployment.run_platforms -vvv'])
+    #stdout, stderr = run.communicate()
+    #
+    #if stdout is not None:
+    #    stdout_str = stdout.decode("utf-8")
+    #    print(stdout_str)
+    #if stderr is not None:
+    #    stderr_str = stderr.decode("utf-8")
+    #    print(stderr_str)
+#
+    #q.put_nowait(80)
+#
+    ## Configure Agents
+    #configure = Popen(['bash', '-c', 'ansible-playbook -i inventory.yml --connection=local volttron.deployment.configure_agents -vvv'])
+    #stdout, stderr = configure.communicate()
+    #
+    #if stdout is not None:
+    #    stdout_str = stdout.decode('utf-8')
+    #    print(stdout_str)
+    #if stderr is not None:
+    #    stderr_str = stderr.decode('utf-8')
+    #    print(stderr_str)
+#
+    #q.put_nowait(100)
 
 # Sets up everything needed to install VOLTTRON based on what was entered 
-def setup_platform(name: str, address: str,  table: List[dict], web_address: Optional[str] = None):    
-    '''Add sources to selected agents, create objects of those agents, append those objects to a list'''
+def setup_platform(name: str, vip_address: str,  table: List[dict], web_address: Optional[str] = None) -> Platform:    
+    '''Add sources to selected agents, create objects of those agents, append those objects to a list, and create config files'''
+    
+    # Create parent directory that any other file created will sit in for utilization; Make directories for agent configuration files and so ansible expects localhost.yml in correct location;
+    os.makedirs(os.path.expanduser("~") + "/.volttron_installer", exist_ok=True)
+    os.makedirs(os.path.expanduser("~") + "/.volttron_installer/agent_configs", exist_ok=True)
+    os.makedirs(os.path.expanduser("~") + "/.volttron_installer/localhost", exist_ok=True)
+
     agent_list = []
     num = 0
-    for num in range(0, 16):
-        for agent in table:
+    for agent in table:
+        for num in range(0, 16):
             if list(AgentName)[num].value in agent.values():
                 agent["source"] = list(AgentSource)[num].value
-                config = agent["config"].replace("'", "\"") # Change single quotes to double so str can be converted to dict
+                config = agent["config"].replace("'", "\"").replace("False", "false").replace("True", "true").replace("None", "null") # Change single quotes to double so str can be converted to dict
+
+                # Create agent config files
+                id = agent["identity"].replace(".", "_")
+                with open(os.path.expanduser("~") + f'/.volttron_installer/agent_configs/{id}_config', 'w') as agent_config:
+                    agent_config.write(config)
+                
+                # Create platform object
+                agent_config_path = os.path.expanduser("~") + f'.volttron_installer/agent_configs/{id}_config'
                 picked_agent = Agent(
                     name=agent["name"],
                     identity=agent["identity"],
                     source=agent["source"],
-                    config=json.loads(config) # json.loads() because config was a string for frontend display
+                    config=agent_config_path
                 )
                 agent_list.append(picked_agent)
-        num += 1
+            num += 1
 
     # Object for platform
-    platform = Platform(name=name, vip_address=address, bind_web_address=web_address, agents=agent_list)
-
-    Popen(['bash', '-c', f'mkdir -p {platform.name}']).wait()
-
-    # Create inventory file for all instances after web server has been opened
-    with open(os.getcwd() + "/inventory.yml", "w") as inventory:
-        inventory.write("---")
-        inventory.write("\nall:")
-        inventory.write("\n  hosts:")
-        inventory.write(f'\n    {platform.name}:') # Change later
-        inventory.write(f'\n      volttron_home: "~/{platform.name}"')
+    platform = Platform(name=name, vip_address=vip_address, bind_web_address=web_address, agents=agent_list)
     
-    with open(os.getcwd() + f'/{platform.name}/{platform.name}.yml', 'w') as config:
-        config.write("---")
-        config.write("\nconfig:")
-        config.write(f'\n  vip-address: {platform.vip_address}\n')
-        if platform.bind_web_address is not None:
-            config.write(f'\n  bind-web-address: {platform.bind_web_address}')
-        config.write("\nagents:")
-        for agent in platform.agents:
-            config.write(f'\n  {agent.identity}:')
-            config.write(f'\n    agent_source: {agent.source}')
-            config.write(f'\n    agent_config: {agent.config}')
-            config.write("\n    agent_running: True")
-            config.write("\n    agent_enabled: True\n")
+    # Create inventory file; currently one host, will change when multiple are implemented
+    inventory = Inventory(platform.name)
+    inventory.write_inventory("inventory.yml")
+
+    # Create platform configuration file
     
     return platform
 
@@ -333,6 +419,7 @@ def add_header():
         'Create': '/create',
         'How To': '/howto'
     }
+
     with ui.header():
         with ui.row():
             for title, target in header_items.items():
@@ -346,13 +433,14 @@ def update_choice(new_name, new_id, new_config): # Pass through objects
     new_id.update()
     new_config.update()
 
-def confirm_platform(platform_name, vip_address, table, web_address_checkbox): # Pass through objects
+def confirm_platform(platform_name, vip_address, table, web_address_checkbox, password): # Pass through objects
     '''Shows what the user has chosen and can be submitted'''
     # Update values on all obj's
     platform_name.update()
     vip_address.update()
     table.update()
     web_address_checkbox.update()
+    password.update()
 
     # Declare web address
     web_address = vip_address.value.replace(vip_address.value.split("://")[0], "http")
@@ -363,9 +451,9 @@ def confirm_platform(platform_name, vip_address, table, web_address_checkbox): #
         loop = asyncio.get_running_loop()
 
         if web_address_checkbox is True:
-            await loop.run_in_executor(pool, install_platform, queue, platform_name.value, vip_address.value, table.rows, web_address.value)
+            await loop.run_in_executor(pool, install_platform, queue, platform_name.value, vip_address.value, table.rows, password.value, web_address.value)
         else:
-            await loop.run_in_executor(pool, install_platform, queue, platform_name.value, vip_address.value, table.rows)
+            await loop.run_in_executor(pool, install_platform, queue, platform_name.value, vip_address.value, table.rows, password.value)
 
 
     queue = Manager().Queue()
@@ -426,13 +514,21 @@ def agent_table():
     
     return table
 
-def output_data():
+def default_home_page():
+    add_header()
+    with ui.row():
+        ui.label("There are currently no platforms installed, please ")
+        ui.button("Create Platform", on_click=create)
+
+
+def create_page():
     '''Platform name, vip-address, and table for agents; option to make vip-address the bind-web-address as well'''
     add_header()
     ui.label("Create Platform").style("font-size: 26px")
 
-    ui.label("Enter the name of the volttron platform. Leave blank for default (volttron)")
-    name = ui.input(label="Platform Name", value="volttron")
+    ui.label("Enter the name of the volttron platform.")
+    with ui.row():
+        name = ui.input(label="Platform Name", value="volttron")
     ui.separator()
 
     ui.label("Enter the vip address of the platform")
@@ -448,16 +544,23 @@ def output_data():
 @ui.page("/")
 def index():
     add_header()
+    if os.path.exists(os.getcwd() + '/platform.pickle'):
+        home_page()
+    else:
+        default_home_page()
 
 @ui.page("/create")
 def create():
     add_header()
-    platform_name_obj, vip_address_obj, agent_table_obj, checkbox = output_data()
+    platform_name_obj, vip_address_obj, agent_table_obj, checkbox = create_page()
 
-    ui.button("Install Platform", on_click=lambda: confirm_platform(platform_name_obj, vip_address_obj, agent_table_obj, checkbox))
+    with ui.row():
+        password = ui.input(placeholder="Password", label="Password", password=True, password_toggle_button=True, validation={'Please enter your password': lambda value: value.strip()})
+        ui.button("Install Platform", on_click=lambda: confirm_platform(platform_name_obj, vip_address_obj, agent_table_obj, checkbox, password))
 
 @ui.page("/howto")
 def howto():
     add_header()
-    
+
+app.on_shutdown(pool.shutdown)
 ui.run(title="VOLTTRON")
