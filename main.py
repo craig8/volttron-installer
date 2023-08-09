@@ -8,6 +8,7 @@ from typing import List, Optional
 from yaml import dump, safe_load
 
 import asyncio
+import json
 import os
 
 pool = ProcessPoolExecutor()
@@ -286,17 +287,36 @@ class Platform:
     @staticmethod
     def read_platform_config(filename: str, platform_name: str) -> 'Platform':
         '''Read Saved Platform Config File'''
+        agent_list = []
+        num = 0
+
         with open(os.path.expanduser("~") + f'/.volttron_installer/platforms/{platform_name}/{filename}/{filename}.yml', 'r') as platform_config_file:
             platform_dict = safe_load(platform_config_file.read())
             
             # Get variables needed for a platform object; Used for frontend
             vip_address = platform_dict['config']['vip_address']
+            hostname = filename
             if 'bind_web_address' in platform_dict['config']:
                 bind_web_address = platform_dict['config']['bind_web_address']
             else:
                 bind_web_address = None
-                    
-            return platform_dict
+
+            for agent_identity, config in platform_dict['agents'].items():
+                for num in range(0, 16):
+                    if agent_identity == list(AgentIdentity)[num].value:
+                        agent_name = list(AgentName)[num].value
+
+                        with open(config['agent_config'], 'r') as config_file:
+                            data = config_file.read()
+                            agent_config = json.loads(data)
+
+                            picked_agent = Agent(name=agent_name, identity=agent_identity, source=config['agent_source'], config=agent_config)
+                            agent_list.append(picked_agent)
+                    num += 1
+
+            platform_obj = Platform(name=platform_name, hostname=hostname, vip_address=vip_address, bind_web_address=bind_web_address, agents=agent_list)   
+
+            return platform_obj
             
 @dataclass
 class Inventory:
@@ -438,6 +458,7 @@ def setup_platform(platform_name: str, hostname: str, vip_address: str,  table: 
                 )
                 agent_list.append(picked_agent)
             num += 1
+
     # Object for platform
     platform = Platform(name=platform_name, hostname=hostname, vip_address=vip_address, bind_web_address=web_address, agents=agent_list)
     print(platform.hostname)
@@ -568,23 +589,57 @@ def agent_table():
 
 def platform_table():
     '''Table to display installed platforms; Allows editing of platforms and agents'''
-    # Get inventory and plaform config dictionaries from saved files
-
-    platforms_path = os.path.expanduser("~") + "/.volttron_installer/platforms/"
-    for platform in os.listdir(platforms_path):
-        if os.path.isdir(platforms_path + platform):
-            inventory1 = Inventory.read_inventory("inventory", platform)
-            platform1 = Platform.read_platform_config(inventory1.hosts[0], platform)
-
     platform_columns = [
         {'name': 'name', 'label': 'Name', 'field': 'name', 'sortable': True},
-        {'name': 'vip_address', 'label': 'VIP Address', 'field': 'address'},
-        {'name': 'web_address', 'label': 'Web Address', 'field': 'address', 'required': False},
-        {'name': 'num_agents', 'label': '# of Agents', 'field': 'agents'}
+        {'name': 'hostname', 'label': 'Hostname', 'field': 'hostname'},
+        {'name': 'vip_address', 'label': 'VIP Address', 'field': 'vip_address'},
+        {'name': 'web_address', 'label': 'Web Address', 'field': 'web_address', 'required': False},
+        {'name': 'num_agents', 'label': '# of Agents', 'field': 'num_agents'}
     ]
 
     platform_rows = []
 
+    # Get inventory and plaform config obj's from saved files; Append info from inventory and platform config to table of platforms
+    num = 0
+    platforms_path = os.path.expanduser("~") + "/.volttron_installer/platforms/"
+    for platform in os.listdir(platforms_path):
+        if os.path.isdir(platforms_path + platform):
+            inventory = Inventory.read_inventory("inventory", platform)
+            for host in range(len(inventory.hosts)):        
+                platform = Platform.read_platform_config(inventory.hosts[host], platform)
+                num += 1
+
+            if platform.bind_web_address == None:
+                platform_rows.append({'name': platform.name, 'hostname': platform.hostname, 'vip_address': platform.vip_address, 'web_address': 'None', 'num_agents': len(platform.agents)})
+            else:
+                platform_rows.append({'name': platform.name, 'hostname': platform.hostname, 'vip_address': platform.vip_address, 'web_address': platform.bind_web_address, 'num_agents': len(platform.agents)})
+
+    table = ui.table(title="Platforms", columns=platform_columns, rows=platform_rows, row_key="name")
+    table.add_slot('header', r'''
+        <q-tr :props="props">
+            <q-th auto-width />
+            <q-th v-for="col in props.cols" :key="col.name" :props="props">
+                {{ col.label }}
+            </q-th>
+        </q-tr>
+    ''')
+    table.add_slot('body', r'''
+        <q-tr :props="props">
+            <q-td auto-width>
+                <q-btn size="sm" color="blue" round dense
+                    @click="props.expand = !props.expand"
+                    :icon="props.expand ? 'remove' : 'add'" />
+            </q-td>
+            <q-td v-for="col in props.cols" :key="col.name" :props="props">
+                {{ col.value }}
+            </q-td>
+        </q-tr>
+        <q-tr v-show="props.expand" :props="props">
+            <q-td colspan="100%">
+                <h4 class="text-left">Agents for {{ props.row.name }}</h4>
+            </q-td>
+        </q-tr>
+    ''')
 def default_home_page():
     add_header()
     with ui.row():
