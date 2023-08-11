@@ -461,7 +461,6 @@ def setup_platform(platform_name: str, hostname: str, vip_address: str,  table: 
 
     # Object for platform
     platform = Platform(name=platform_name, hostname=hostname, vip_address=vip_address, bind_web_address=web_address, agents=agent_list)
-    print(platform.hostname)
     # Create inventory file; currently one host, will change when multiple are implemented
     inventory = Inventory([platform.hostname])
     inventory.write_inventory("inventory", platform.name)
@@ -473,13 +472,12 @@ def setup_platform(platform_name: str, hostname: str, vip_address: str,  table: 
 
 # --------------------------------------------- WEB SIDE ---------------------------------------------
 
-# Columns and rows for agent selection table
-agent_columns = [
-    {'name': 'name', 'label': 'Name', 'field': 'name', 'sortable': True, 'required': True},
+# Columns for agent tables; Constant variable
+AGENT_COLUMNS = [
+    {'name': 'name', 'label': 'Name', 'field': 'name', 'required': True},
     {'name': 'identity', 'label': 'Identity', 'field': 'identity', 'required': False},
     {'name': 'config', 'label': 'Configuration', 'field': 'config', 'required': False}
 ]
-agent_rows = []
 
 def add_header():
     '''Add header'''
@@ -502,9 +500,10 @@ def update_choice(new_name, new_id, new_config): # Pass through objects
     new_id.update()
     new_config.update()
 
-def confirm_platform(platform_name, hostname, vip_address, table, web_address_checkbox, password): # Pass through objects
+def confirm_platform(title, platform_name, hostname, vip_address, table, web_address_checkbox, password): # Pass through objects
     '''Shows what the user has chosen and can be submitted'''
-    # Update values on all obj's to what user has entered
+
+    # Update values to what was entered
     platform_name.update()
     hostname.update()
     vip_address.update()
@@ -529,7 +528,7 @@ def confirm_platform(platform_name, hostname, vip_address, table, web_address_ch
 
     # Output web address if checkbox was clicked
     with ui.dialog() as dialog, ui.card():
-        ui.label("Overview of Selection").style("font-size: 26px")
+        ui.label(title).style("font-size: 26px")
         with ui.row():
             ui.label("Platform Name:")
             ui.label(platform_name.value)
@@ -551,7 +550,7 @@ def confirm_platform(platform_name, hostname, vip_address, table, web_address_ch
             pass
 
         with ui.row():
-            ui.table(title='Agents', columns=agent_columns, rows=table.rows)
+            ui.table(title='Agents', columns=AGENT_COLUMNS, rows=table.rows)
         with ui.row():
             ui.button("Cancel", on_click=dialog.close)
             ui.button("Confirm", on_click=start_installation)
@@ -561,10 +560,9 @@ def confirm_platform(platform_name, hostname, vip_address, table, web_address_ch
         ui.timer(0.1, callback=lambda: progress.set_value(queue.get() if not queue.empty() else progress.value))
     dialog.open()
 
-def agent_table():
+def agent_table(rows):
     '''Table for selecting agents'''
-    ui.label("Pick your agent and overwrite the default configuration/identity if needed")
-    with ui.table(title='Agents', columns=agent_columns, rows=agent_rows, row_key='name', selection='multiple').classes('w-75') as table:
+    with ui.table(title='Agents', columns=AGENT_COLUMNS, rows=rows, row_key='name', selection='multiple').classes('w-75') as table:
         with table.add_slot('header'):
             with table.row():
                 with table.cell():
@@ -587,6 +585,51 @@ def agent_table():
     
     return table
 
+def edit_page():
+    '''Edit Platform; Can edit anything that was inputted (agents, configs, names, etc.); Currently meant for one platform'''
+    
+    # Rows for agent selection table
+    agent_rows = []
+
+    num = 0
+    platforms_path = os.path.expanduser("~") + "/.volttron_installer/platforms/"
+    for platform_dir in os.listdir(platforms_path):
+        if os.path.isdir(platforms_path + platform_dir):
+            inventory = Inventory.read_inventory("inventory", platform_dir)
+            for host in range(len(inventory.hosts)):        
+                platform = Platform.read_platform_config(inventory.hosts[host], platform_dir)
+            
+            num += 1
+
+    # Update agent_rows so table shows correct data
+    for agent in platform.agents:
+        agent_rows.append({'name': agent.name, 'identity': agent.identity, 'config': str(agent.config)})
+
+    add_header()
+    # Output web address if checkbox was clicked
+    ui.label("Edit Platform").style("font-size: 26px")
+    with ui.row():
+        ui.label("Platform Name:")
+        platform_name = ui.input(label="Platform Name", value=platform.name)
+    ui.separator()
+    with ui.row():
+        ui.label("Hostname:")
+        hostname = ui.input(label="Hostname", value=platform.hostname)
+    ui.separator()
+    with ui.row():
+        ui.label("VIP Address:")
+        vip_address = ui.input(label="VIP Address", value=platform.vip_address)
+        if platform.bind_web_address is None:
+            web_address_checkbox = ui.checkbox("Use for Web Address (Only if web is enabled)")
+        else:
+            web_address_checkbox = ui.checkbox("Use for Web Address (Only if web is enabled)", value=True)
+        
+        ui.separator()
+    
+    table = agent_table(agent_rows)
+                       
+    return platform_name, hostname, vip_address, table, web_address_checkbox
+    
 def platform_table():
     '''Table to display installed platforms; Allows editing of platforms and agents'''
     platform_columns = [
@@ -602,44 +645,25 @@ def platform_table():
     # Get inventory and plaform config obj's from saved files; Append info from inventory and platform config to table of platforms
     num = 0
     platforms_path = os.path.expanduser("~") + "/.volttron_installer/platforms/"
-    for platform in os.listdir(platforms_path):
-        if os.path.isdir(platforms_path + platform):
-            inventory = Inventory.read_inventory("inventory", platform)
+    for platform_dir in os.listdir(platforms_path):
+        if os.path.isdir(platforms_path + platform_dir):
+            inventory = Inventory.read_inventory("inventory", platform_dir)
             for host in range(len(inventory.hosts)):        
-                platform = Platform.read_platform_config(inventory.hosts[host], platform)
-                num += 1
+                platform = Platform.read_platform_config(inventory.hosts[host], platform_dir)
+                if platform.bind_web_address == None:
+                    platform_rows.append({'name': platform.name, 'hostname': platform.hostname, 'vip_address': platform.vip_address, 'web_address': 'None', 'num_agents': len(platform.agents)})
+                else:
+                    platform_rows.append({'name': platform.name, 'hostname': platform.hostname, 'vip_address': platform.vip_address, 'web_address': platform.bind_web_address, 'num_agents': len(platform.agents)})
+            
+            num += 1
 
-            if platform.bind_web_address == None:
-                platform_rows.append({'name': platform.name, 'hostname': platform.hostname, 'vip_address': platform.vip_address, 'web_address': 'None', 'num_agents': len(platform.agents)})
-            else:
-                platform_rows.append({'name': platform.name, 'hostname': platform.hostname, 'vip_address': platform.vip_address, 'web_address': platform.bind_web_address, 'num_agents': len(platform.agents)})
+    table = ui.table(title="Platforms", columns=platform_columns, rows=platform_rows, row_key="name", selection="single")
 
-    table = ui.table(title="Platforms", columns=platform_columns, rows=platform_rows, row_key="name")
-    table.add_slot('header', r'''
-        <q-tr :props="props">
-            <q-th auto-width />
-            <q-th v-for="col in props.cols" :key="col.name" :props="props">
-                {{ col.label }}
-            </q-th>
-        </q-tr>
-    ''')
-    table.add_slot('body', r'''
-        <q-tr :props="props">
-            <q-td auto-width>
-                <q-btn size="sm" color="blue" round dense
-                    @click="props.expand = !props.expand"
-                    :icon="props.expand ? 'remove' : 'add'" />
-            </q-td>
-            <q-td v-for="col in props.cols" :key="col.name" :props="props">
-                {{ col.value }}
-            </q-td>
-        </q-tr>
-        <q-tr v-show="props.expand" :props="props">
-            <q-td colspan="100%">
-                <h4 class="text-left">Agents for {{ props.row.name }}</h4>
-            </q-td>
-        </q-tr>
-    ''')
+    with ui.row():
+        ui.button('Edit', on_click=lambda: ui.open("http://127.0.0.1:8080/edit")).bind_visibility_from(table, 'selected', backward=lambda val: bool(val))
+        ui.button('Remove', on_click=lambda: table.remove_rows(*table.selected)) \
+            .bind_visibility_from(table, 'selected', backward=lambda val: bool(val))
+    
 def default_home_page():
     add_header()
     with ui.row():
@@ -654,6 +678,10 @@ def home_page():
 
 def create_page():
     '''Platform name, vip-address, and table for agents; option to make vip-address the bind-web-address as well'''
+    
+    # Rows for agent selection table
+    agent_rows = []    
+
     add_header()
     ui.label("Create Platform").style("font-size: 26px")
 
@@ -671,13 +699,13 @@ def create_page():
         web_address_checkbox = ui.checkbox("Use for Web Address (Only if web is enabled)")
     ui.separator()
 
-    table = agent_table()
+    ui.label("Pick your agent and overwrite the default configuration/identity if needed")
+    table = agent_table(agent_rows)
     return platform_name, hostname, address, table, web_address_checkbox
 
 # Pages; Still need to work on index (home) page and howto
 @ui.page("/")
 def index():
-    add_header()
     if os.path.exists(os.path.expanduser("~") + '/.volttron_installer'):
         home_page()
     else:
@@ -685,12 +713,20 @@ def index():
 
 @ui.page("/create")
 def create():
-    add_header()
     platform_name_obj, hostname_obj, vip_address_obj, agent_table_obj, checkbox = create_page()
 
     with ui.row():
         password = ui.input(placeholder="Password", label="Password", password=True, password_toggle_button=True, validation={'Please enter your password': lambda value: value.strip()})
-        ui.button("Install Platform", on_click=lambda: confirm_platform(platform_name_obj, hostname_obj, vip_address_obj, agent_table_obj, checkbox, password))
+        ui.button("Install Platform", on_click=lambda: confirm_platform("Overview of Configuration", platform_name_obj, hostname_obj, vip_address_obj, agent_table_obj, checkbox, password))
+
+@ui.page("/edit")
+def edit():
+    add_header()
+    platform_name_obj, hostname_obj, vip_address_obj, agent_table_obj, checkbox = edit_page()
+
+    with ui.row():
+        password = ui.input(placeholder="Password", label="Password", password=True, password_toggle_button=True, validation={'Please enter your password': lambda value: value.strip()})
+        ui.button("Save Platform", on_click=lambda: confirm_platform("Save Configuration", platform_name_obj, hostname_obj, vip_address_obj, agent_table_obj, checkbox, password))
 
 @ui.page("/howto")
 def howto():
