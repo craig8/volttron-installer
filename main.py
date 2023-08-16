@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from multiprocessing import Manager, Queue
 from nicegui import app, ui
+from shutil import rmtree
 from subprocess import PIPE, Popen
 from typing import List, Optional
 from yaml import dump, safe_load
@@ -500,7 +501,11 @@ def update_choice(new_name, new_id, new_config): # Pass through objects
     new_id.update()
     new_config.update()
 
-def confirm_platform(title, platform_name, hostname, vip_address, table, web_address_checkbox, password): # Pass through objects
+def remove_platform(name):
+    '''Removes old platform files when changes are saved or platform is deleted'''
+    rmtree(os.path.expanduser("~") + "/.volttron_installer/platforms/" + name)
+
+def confirm_platform(title, platform_name, hostname, vip_address, table, web_address_checkbox, password, old_platform_name: Optional[str] = None): # Pass through objects
     '''Shows what the user has chosen and can be submitted'''
 
     # Update values to what was entered
@@ -523,6 +528,13 @@ def confirm_platform(title, platform_name, hostname, vip_address, table, web_add
         else:
             await loop.run_in_executor(pool, install_platform, queue, platform_name.value, hostname.value, vip_address.value, table.rows, password.value)
 
+    async def create_platform(original_platform_name: Optional[str] = None):
+        '''Start installation of platform; Remove old platform files if platform is being edited'''
+        if original_platform_name is None:
+            await start_installation()
+        else:
+            remove_platform(original_platform_name)
+            await start_installation()
 
     queue = Manager().Queue()
 
@@ -553,7 +565,7 @@ def confirm_platform(title, platform_name, hostname, vip_address, table, web_add
             ui.table(title='Agents', columns=AGENT_COLUMNS, rows=table.rows)
         with ui.row():
             ui.button("Cancel", on_click=dialog.close)
-            ui.button("Confirm", on_click=start_installation)
+            ui.button("Confirm", on_click=lambda: create_platform(old_platform_name))
             progress = ui.circular_progress(min=0, max=100, value=0, size="xl").props('instant-feedback')
             progress.visible = False
             
@@ -642,7 +654,7 @@ def platform_table():
 
     platform_rows = []
 
-    # Get inventory and plaform config obj's from saved files; Append info from inventory and platform config to table of platforms
+    # Get inventory and plaform config obj's from saved files; Append info from inventory and platform config to table rows of platforms
     num = 0
     platforms_path = os.path.expanduser("~") + "/.volttron_installer/platforms/"
     for platform_dir in os.listdir(platforms_path):
@@ -658,11 +670,8 @@ def platform_table():
             num += 1
 
     table = ui.table(title="Platforms", columns=platform_columns, rows=platform_rows, row_key="name", selection="single")
-
-    with ui.row():
-        ui.button('Edit', on_click=lambda: ui.open("http://127.0.0.1:8080/edit")).bind_visibility_from(table, 'selected', backward=lambda val: bool(val))
-        ui.button('Remove', on_click=lambda: table.remove_rows(*table.selected)) \
-            .bind_visibility_from(table, 'selected', backward=lambda val: bool(val))
+    
+    return table
     
 def default_home_page():
     add_header()
@@ -672,7 +681,49 @@ def default_home_page():
 
 def home_page():
     add_header()
-    platform_table()
+    table = platform_table()
+
+    def open_edit_page(platform: str):
+        '''Creates endpoint required for edit page and opens the edit page'''
+        platform_str = platform.replace("'", "\"")
+        platform_list = json.loads(platform_str)
+        original_platform_name = platform_list[0]['name']
+        
+        ui.open(f"http://127.0.0.1:8080/edit/{original_platform_name}")
+
+    def handle_confirm_remove(original_platform_name: str, dialog):
+        '''Handles on_click event when user confirms the removal of a platform'''
+        # Remove row where platform was being displayed
+        table.remove_rows(*table.selected)
+        table.selected.clear()
+
+        remove_platform(original_platform_name)
+
+        dialog.close()
+
+    def confirm_remove(platform):
+        '''Confirmation of platform removal'''
+        # Get old platform name for overriding
+        platform_str = platform.replace("'", "\"")
+        platform_list = json.loads(platform_str)
+        original_platform_name = platform_list[0]['name']
+
+        with ui.dialog() as dialog, ui.card():
+            ui.label("Confirm?").style("font-size: 20px")
+            ui.label(f"Are you sure you want to remove the {original_platform_name} platform? This action cannot be undone.")
+
+            with ui.row():
+                ui.button("Cancel", on_click=dialog.close)
+                ui.button("Confirm", on_click=lambda: handle_confirm_remove(original_platform_name, dialog))
+        dialog.open()
+        
+    with ui.row().bind_visibility_from(table, 'selected', backward=lambda val: bool(val)):
+        ui.button('Edit', on_click=lambda: open_edit_page(label.text))
+        ui.button('Remove', on_click=lambda: confirm_remove(label.text))
+    
+    with ui.row():
+        ui.label("Current Selection:")
+        label = ui.label().bind_text_from(table, 'selected', lambda val: str(val))
 
 
 
@@ -703,7 +754,7 @@ def create_page():
     table = agent_table(agent_rows)
     return platform_name, hostname, address, table, web_address_checkbox
 
-# Pages; Still need to work on index (home) page and howto
+# Pages; Howto still needs to be developed
 @ui.page("/")
 def index():
     if os.path.exists(os.path.expanduser("~") + '/.volttron_installer'):
@@ -719,14 +770,14 @@ def create():
         password = ui.input(placeholder="Password", label="Password", password=True, password_toggle_button=True, validation={'Please enter your password': lambda value: value.strip()})
         ui.button("Install Platform", on_click=lambda: confirm_platform("Overview of Configuration", platform_name_obj, hostname_obj, vip_address_obj, agent_table_obj, checkbox, password))
 
-@ui.page("/edit")
-def edit():
+@ui.page("/edit/{orig_platform_name}")
+def edit(orig_platform_name):
     add_header()
     platform_name_obj, hostname_obj, vip_address_obj, agent_table_obj, checkbox = edit_page()
 
     with ui.row():
         password = ui.input(placeholder="Password", label="Password", password=True, password_toggle_button=True, validation={'Please enter your password': lambda value: value.strip()})
-        ui.button("Save Platform", on_click=lambda: confirm_platform("Save Configuration", platform_name_obj, hostname_obj, vip_address_obj, agent_table_obj, checkbox, password))
+        ui.button("Save Platform", on_click=lambda: confirm_platform("Save Configuration", platform_name_obj, hostname_obj, vip_address_obj, agent_table_obj, checkbox, password, orig_platform_name))
 
 @ui.page("/howto")
 def howto():
