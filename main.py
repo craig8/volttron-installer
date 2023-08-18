@@ -248,10 +248,10 @@ class Agent:
 class Platform:
     '''Class for Platform and to Create Platform Configuration; Currently meant for one platform '''
     name: str = "volttron"
-    hostname: str = "localhost"
-    vip_address: str = "tcp://127.0.0.1:22916"
-    bind_web_address: Optional[str] = None
-    agents: List[Agent] = field(default_factory=[])
+    hosts: List[str] = field(default_factory=[])
+    vip_address: List[str] = "tcp://127.0.0.1:22916"
+    bind_web_address: Optional[List[str]] = field(default_factory=[])
+    agents: List[List[Agent]] = field(default_factory=[])
 
     def write_platform_config(self, filename: str, platform_name: str):
         '''Write Platform Config File'''
@@ -426,7 +426,6 @@ def install_platform(q: Queue, platform_name: str, hostname: str, vip_address: s
 
     #q.put_nowait(100)
 
-# Sets up everything needed to install VOLTTRON based on what was entered 
 def setup_platform(platform_name: str, hostname: str, vip_address: str,  table: List[dict], web_address: Optional[str] = None) -> Platform:    
     '''Add sources to selected agents, create objects of those agents, append those objects to a list, and create config files'''
     
@@ -466,7 +465,7 @@ def setup_platform(platform_name: str, hostname: str, vip_address: str,  table: 
     inventory = Inventory([platform.hostname])
     inventory.write_inventory("inventory", platform.name)
 
-    # Create platform configuration file after inventory; Pass through platform (host) name to meet where volttron-ansible is expecting our platform config file
+    # Create platform configuration file after inventory; Pass through hostname to meet where volttron-ansible is expecting our platform config file
     platform.write_platform_config(platform.hostname, platform.name)
     
     return platform
@@ -479,6 +478,8 @@ AGENT_COLUMNS = [
     {'name': 'identity', 'label': 'Identity', 'field': 'identity', 'required': False},
     {'name': 'config', 'label': 'Configuration', 'field': 'config', 'required': False}
 ]
+
+host_list = []
 
 def add_header():
     '''Add header'''
@@ -505,72 +506,74 @@ def remove_platform(name):
     '''Removes old platform files when changes are saved or platform is deleted'''
     rmtree(os.path.expanduser("~") + "/.volttron_installer/platforms/" + name)
 
-def confirm_platform(title, platform_name, hostname, vip_address, table, web_address_checkbox, password, old_platform_name: Optional[str] = None): # Pass through objects
+def confirm_platform(title, platform): # Pass through objects
     '''Shows what the user has chosen and can be submitted'''
 
-    # Update values to what was entered
-    platform_name.update()
-    hostname.update()
-    vip_address.update()
-    table.update()
-    web_address_checkbox.update()
-    password.update()
-
-    # Declare web address
-    web_address = vip_address.value.replace(vip_address.value.split("://")[0], "http")
-    async def start_installation():
-        '''Async event handler; Will install platform'''
-        progress.visible = True
-        loop = asyncio.get_running_loop()
-
-        if web_address_checkbox.value is True:
-            await loop.run_in_executor(pool, install_platform, queue, platform_name.value, hostname.value, vip_address.value, table.rows, password.value, web_address)
-        else:
-            await loop.run_in_executor(pool, install_platform, queue, platform_name.value, hostname.value, vip_address.value, table.rows, password.value)
-
-    async def create_platform(original_platform_name: Optional[str] = None):
-        '''Start installation of platform; Remove old platform files if platform is being edited'''
-        if original_platform_name is None:
-            await start_installation()
-        else:
-            remove_platform(original_platform_name)
-            await start_installation()
-
-    queue = Manager().Queue()
-
-    # Output web address if checkbox was clicked
-    with ui.dialog() as dialog, ui.card():
-        ui.label(title).style("font-size: 26px")
-        with ui.row():
-            ui.label("Platform Name:")
-            ui.label(platform_name.value)
-        ui.separator()
-        with ui.row():
-            ui.label("Hostname:")
-            ui.label(hostname.value)
-        ui.separator()
-        with ui.row():
-            ui.label("VIP Address:")
-            ui.label(vip_address.value)
-        ui.separator()
-        if web_address_checkbox.value is True:
-            with ui.row():
-                ui.label("Web Address:")
-                ui.label(web_address)
-                ui.separator()
-        else:
-            pass
-
-        with ui.row():
-            ui.table(title='Agents', columns=AGENT_COLUMNS, rows=table.rows)
-        with ui.row():
-            ui.button("Cancel", on_click=dialog.close)
-            ui.button("Confirm", on_click=lambda: create_platform(old_platform_name))
-            progress = ui.circular_progress(min=0, max=100, value=0, size="xl").props('instant-feedback')
-            progress.visible = False
-            
-        ui.timer(0.1, callback=lambda: progress.set_value(queue.get() if not queue.empty() else progress.value))
-    dialog.open()
+    print(platform)
+   ## Update values to what was entered
+   #hostname.update()
+   #vip_address.update()
+   #table.update()
+   #web_address_checkbox.update()
+#
+   ## Declare web address
+   #web_address = vip_address.value.replace(vip_address.value.split("://")[0], "http")
+   #async def start_installation():
+   #    '''Async event handler; Will install platform'''
+   #    progress.visible = True
+   #    loop = asyncio.get_running_loop()
+#
+   #    if web_address_checkbox.value is True:
+   #        await loop.run_in_executor(pool, install_platform, queue, platform_name, hostname.value, vip_address.value, table.rows, web_address)
+   #    else:
+   #        await loop.run_in_executor(pool, install_platform, queue, platform_name, hostname.value, vip_address.value, table.rows)
+#
+   #async def create_platform(original_platform_name: Optional[str] = None):
+   #    '''Start installation of platform; Remove old platform files if platform is being edited'''
+   #    if original_platform_name is None:
+   #        await start_installation()
+   #    else:
+   #        remove_platform(original_platform_name)
+   #        await start_installation()
+#
+   #queue = Manager().Queue()
+#
+   ## Output web address if checkbox was clicked
+   #with ui.dialog() as dialog, ui.card():
+   #    ui.label(title).style("font-size: 26px")
+   #    with ui.row():
+   #        ui.label("Platform Name:")
+   #        ui.label(platform_name)
+   #    ui.separator()
+   #    with ui.row():
+   #        ui.label("Hostname:")
+   #        ui.label(hostname.value)
+   #    ui.separator()
+   #    with ui.row():
+   #        ui.label("VIP Address:")
+   #        ui.label(vip_address.value)
+   #    ui.separator()
+   #    if web_address_checkbox.value is True:
+   #        with ui.row():
+   #            ui.label("Web Address:")
+   #            ui.label(web_address)
+   #            ui.separator()
+   #    else:
+   #        pass
+#
+   #    with ui.row():
+   #        ui.table(title='Agents', columns=AGENT_COLUMNS, rows=table.rows)
+   #    
+   #    ui.label("Enter your password then click 'Confirm' to start the installation process")
+   #    with ui.row():
+#
+   #        ui.button("Cancel", on_click=dialog.close)
+   #        ui.button("Confirm", on_click=lambda: create_platform(old_platform_name))
+   #        progress = ui.circular_progress(min=0, max=100, value=0, size="xl").props('instant-feedback')
+   #        progress.visible = False
+   #        
+   #    ui.timer(0.1, callback=lambda: progress.set_value(queue.get() if not queue.empty() else progress.value))
+   #dialog.open()
 
 def agent_table(rows):
     '''Table for selecting agents'''
@@ -726,49 +729,171 @@ def home_page():
         label = ui.label().bind_text_from(table, 'selected', lambda val: str(val))
 
 
+def add_host(platform_name: str, host_list: list):
+    '''Adds host to host list and opens configuration page for that host'''
+    if host_list == []:
+        hostname = "host1"
+        host_list.append(hostname)
+        ui.open(f"http://127.0.0.1:8080/create/{platform_name}/{hostname}")
+    else:    
+        hostname = f"host{len(host_list) + 1}"
+        host_list.append(hostname)
+        ui.open(f"http://127.0.0.1:8080/create/{platform_name}/{hostname}")
+
+# Make a global platform obj that will be used so each host can append configurations to the overall platform
+platform = Platform(name="", hosts=[], vip_address=[], bind_web_address=[], agents=[])
+def save_host(platform_name: str, hostname: str, vip_address: str, checkbox: bool, table_rows: List[dict]):
+    '''Save host configuration and append values to an object'''
+    os.makedirs(os.path.expanduser("~") + f'/.volttron_installer/platforms/{platform_name}/agent_configs/{hostname}', exist_ok=True)
+
+    agent_list = []
+    for agent in table_rows:
+        for num in range(0, 16):
+            if list(AgentName)[num].value in agent['name']:
+                agent["source"] = list(AgentSource)[num].value
+
+                #id = agent["identity"].replace(".", "_")
+                #agent_config_path = os.path.expanduser("~") + f'/.volttron_installer/platforms/{platform_name}/agent_configs/{hostname}/{id}_config'
+
+                # Append to list of agents
+                picked_agent = Agent(
+                    name=agent["name"],
+                    identity=agent["identity"],
+                    source=agent["source"],
+                    config=agent["config"]
+                )
+                agent_list.append(picked_agent)
+
+
+    platform.name = platform_name
+    platform.hosts.append(hostname)
+    platform.vip_address.append(vip_address)
+    if checkbox is True:
+        web_address = vip_address.replace(vip_address.split("://")[0], "http")
+        platform.bind_web_address.append(web_address)
+    else:
+        platform.bind_web_address.append(None)
+
+    platform.agents.append(agent_list)
+    ui.open(create)
+
+def edit_host(host: str, platform_name: str, new_hostname: str, vip_address: str, checkbox_value: bool, table_rows: List[dict]):
+    for index, hostname in enumerate(platform.hosts):
+        if hostname == host:
+            agent_list = []
+            for agent in table_rows:
+                for num in range(0, 16):
+                    if list(AgentName)[num].value in agent['name']:
+                        agent["source"] = list(AgentSource)[num].value
+                        picked_agent = Agent(
+                            name=agent["name"],
+                            identity=agent["identity"],
+                            source=agent["source"],
+                            config=agent["config"]
+                        )
+                agent_list.append(picked_agent)
+            
+            # Update values
+            platform.hosts[index] = new_hostname
+            platform.name = platform_name
+            platform.vip_address[index] = vip_address
+
+            if checkbox_value is True:
+                web_address = vip_address.replace(vip_address.split("://")[0], "http")
+                platform.bind_web_address[index] = web_address
+            else:
+                web_address = None
+                platform.bind_web_address[index] = web_address
+            
+            platform.agents[index] = agent_list
+        
+    print(platform)
+        
+    ui.open(create)
 
 def create_page():
-    '''Platform name, vip-address, and table for agents; option to make vip-address the bind-web-address as well'''
+    '''Platform name and option to add multiple hosts; Clicking "Add Host" will open new page for configuration'''
     
-    # Rows for agent selection table
-    agent_rows = []    
-
-    add_header()
     ui.label("Create Platform").style("font-size: 26px")
 
     ui.label("Enter the name of the volttron platform.")
     platform_name = ui.input(label="Platform Name", value="volttron1")
     ui.separator()
 
-    ui.label("Enter the name of the host")
-    hostname = ui.input(label="Hostname", value="localhost")
-    ui.separator()
-
-    ui.label("Enter the vip address of the platform")
+    ui.label("Hosts")
     with ui.row():
-        address = ui.input(label="VIP Address", value="tcp://127.0.0.1:22916")
-        web_address_checkbox = ui.checkbox("Use for Web Address (Only if web is enabled)")
-    ui.separator()
+        if platform.hosts == []:
+            ui.label("There are currently no hosts")
+        else:
+            for host in platform.hosts:
+                ui.link(host, f'/create/{platform_name.value}/{host}')
 
-    ui.label("Pick your agent and overwrite the default configuration/identity if needed")
-    table = agent_table(agent_rows)
-    return platform_name, hostname, address, table, web_address_checkbox
+        ui.button("Add Host", on_click=lambda: add_host(platform_name.value, host_list))
+    ui.separator()
 
 # Pages; Howto still needs to be developed
 @ui.page("/")
 def index():
-    if os.path.exists(os.path.expanduser("~") + '/.volttron_installer'):
+    # Check if any directories exist
+    if os.listdir(os.path.expanduser("~") + "/.volttron_installer/platforms"):
         home_page()
     else:
         default_home_page()
 
 @ui.page("/create")
 def create():
-    platform_name_obj, hostname_obj, vip_address_obj, agent_table_obj, checkbox = create_page()
+    create_page()
 
-    with ui.row():
-        password = ui.input(placeholder="Password", label="Password", password=True, password_toggle_button=True, validation={'Please enter your password': lambda value: value.strip()})
-        ui.button("Install Platform", on_click=lambda: confirm_platform("Overview of Configuration", platform_name_obj, hostname_obj, vip_address_obj, agent_table_obj, checkbox, password))
+@ui.page("/create/{platform_name}/{hostname}")
+def create_host(platform_name: str, hostname: str):
+    print(platform)
+    if platform.hosts == [] or platform.hosts != [] and hostname not in platform.hosts:
+        agent_rows = []
+        ui.label(f"Configuration for {hostname} for {platform_name}").style("font-size: 26px")
+
+        ui.label("Enter the hostname of your host machine")
+        new_hostname = ui.input(label="Hostname", placeholder="localhost", validation={'Please enter a hostname': lambda value: value.strip()})
+
+        ui.label("Enter the vip address of the host")
+        with ui.row():
+            address = ui.input(label="VIP Address", value="tcp://127.0.0.1:22916")
+            web_address_checkbox = ui.checkbox("Use for Web Address (Only if web is enabled)")
+        ui.separator()
+
+        ui.label("Pick your agent and overwrite the default configuration/identity if needed")
+        table = agent_table(agent_rows)
+
+        with ui.row():
+            ui.button("Save Host", on_click=lambda: save_host(platform_name, new_hostname.value, address.value, web_address_checkbox.value, table.rows))
+    else: 
+        for index, host in enumerate(platform.hosts):
+            if host == hostname:
+                agent_rows = []
+                ui.label(f"Configuration for {hostname} for {platform_name}").style("font-size: 26px")
+
+                ui.label("Enter the hostname of your host machine")
+                new_hostname = ui.input(label="Hostname", value=host,validation={'Please enter a hostname': lambda value: value.strip()})
+
+                ui.label("Enter the vip address of the host")
+                if platform.bind_web_address[index] is None:
+                    with ui.row():
+                        address = ui.input(label="VIP Address", value=platform.vip_address[index])
+                        web_address_checkbox = ui.checkbox("Use for Web Address (Only if web is enabled)", value=False)
+                    ui.separator()
+                else:
+                    with ui.row():
+                        address = ui.input(label="VIP Address", value=platform.vip_address[index])
+                        web_address_checkbox = ui.checkbox("Use for Web Address (Only if web is enabled)", value=True)
+
+                    ui.separator()
+
+                for agent in platform.agents[index]:
+                    agent_rows.append({'name': agent.name, 'identity': agent.identity, 'config': str(agent.config)})
+
+                ui.label("Pick your agent and overwrite the default configuration/identity if needed")
+                table = agent_table(agent_rows)
+
+                ui.button("Save Changes to Host", on_click=lambda: edit_host(host, platform_name, new_hostname.value, address.value, web_address_checkbox.value, table.rows))
 
 @ui.page("/edit/{orig_platform_name}")
 def edit(orig_platform_name):
@@ -776,8 +901,7 @@ def edit(orig_platform_name):
     platform_name_obj, hostname_obj, vip_address_obj, agent_table_obj, checkbox = edit_page()
 
     with ui.row():
-        password = ui.input(placeholder="Password", label="Password", password=True, password_toggle_button=True, validation={'Please enter your password': lambda value: value.strip()})
-        ui.button("Save Platform", on_click=lambda: confirm_platform("Save Configuration", platform_name_obj, hostname_obj, vip_address_obj, agent_table_obj, checkbox, password, orig_platform_name))
+        ui.button("Save Platform", on_click=lambda: confirm_platform("Save Configuration", platform_name_obj, hostname_obj, vip_address_obj, agent_table_obj, checkbox, orig_platform_name))
 
 @ui.page("/howto")
 def howto():
