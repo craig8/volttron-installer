@@ -274,10 +274,6 @@ class Platform:
 
             # Loop through selected agents to write their configurations
             for agent in self.agents[index]:
-                print(agent.name)
-                print(agent.identity)
-                print(agent.source)
-                print(agent.config)
                 platform_dict['agents'].update({
                     agent.identity: {
                         "agent_source": agent.source,
@@ -291,17 +287,20 @@ class Platform:
                 dump(platform_dict, platform_config_file)
     
     @staticmethod
-    def read_platform_config(filename: str, platform_name: str) -> 'Platform':
+    def read_platform_config(hosts: List[str], platform_name: str) -> 'Platform':
         '''Read Saved Platform Config File'''
-        agent_list = []
-        num = 0
 
-        with open(os.path.expanduser("~") + f'/.volttron_installer/platforms/{platform_name}/{filename}/{filename}.yml', 'r') as platform_config_file:
-            platform_dict = safe_load(platform_config_file.read())
-            
-            # Get variables needed for a platform object; Used for frontend
+        platform_obj = Platform(name=[], hosts=[], vip_address=[], bind_web_address=[], agents=[])
+        platform_obj.name = platform_name
+        
+        for host in hosts:
+            agent_list = []
+
+            with open(os.path.expanduser("~") + f'/.volttron_installer/platforms/{platform_name}/{host}/{host}.yml', 'r') as platform_config_file:
+                platform_dict = safe_load(platform_config_file.read())
+                
+            # Get variables needed for the platform object; Used for frontend
             vip_address = platform_dict['config']['vip_address']
-            hostname = filename
             if 'bind_web_address' in platform_dict['config']:
                 bind_web_address = platform_dict['config']['bind_web_address']
             else:
@@ -316,13 +315,15 @@ class Platform:
                             data = config_file.read()
                             agent_config = json.loads(data)
 
-                            picked_agent = Agent(name=agent_name, identity=agent_identity, source=config['agent_source'], config=agent_config)
-                            agent_list.append(picked_agent)
-                    num += 1
+                        picked_agent = Agent(name=agent_name, identity=agent_identity, source=config['agent_source'], config=agent_config)
+                        agent_list.append(picked_agent)
 
-            platform_obj = Platform(name=platform_name, hostname=hostname, vip_address=vip_address, bind_web_address=bind_web_address, agents=agent_list)   
+            platform_obj.hosts.append(host)
+            platform_obj.vip_address.append(vip_address)
+            platform_obj.bind_web_address.append(bind_web_address)
+            platform_obj.agents.append(agent_list)
 
-            return platform_obj
+        return platform_obj
             
 @dataclass
 class Inventory:
@@ -445,14 +446,14 @@ def create_files(platform: Platform):
         for agent in platform.agents[index]:
             for num in range(0, 16):
                 if list(AgentName)[num].value == agent.name:
-                    config = agent.config.replace("'", "\"").replace("False", "false").replace("True", "true").replace("None", "null") # Change single quotes to double so str can be converted to dict
+                    config_str = str(agent.config)
+                    config = config_str.replace("'", "\"").replace("False", "false").replace("True", "true").replace("None", "null") # Change single quotes to double so str can be converted to dict
 
                     # Create agent config files
                     id = agent.identity.replace(".", "_")
                     with open(os.path.expanduser("~") + f'/.volttron_installer/platforms/{platform.name}/{host}/agent_configs/{id}_config', 'w') as agent_config:
                         agent_config.write(config)
 
-                    # Create platform object
                     agent_config_path = os.path.expanduser("~") + f'/.volttron_installer/platforms/{platform.name}/{host}/agent_configs/{id}_config'
                     agent.config = agent_config_path
                 num += 1
@@ -504,7 +505,6 @@ def remove_platform(name):
 
 def confirm_platform(old_platform_name: Optional[str] = None):
     '''Shows what the user has chosen and can be submitted'''
-    print(platform)
 
     async def start_installation():
         '''Async event handler; Will install platform'''
@@ -534,7 +534,6 @@ def confirm_platform(old_platform_name: Optional[str] = None):
     for index, host in enumerate(platform.hosts):
         rows = []
         for agent in platform.agents[index]:
-            print(agent)
             rows.append({'name': agent.name, 'identity': agent.identity, 'config': str(agent.config)})
 
         with ui.row():
@@ -590,59 +589,11 @@ def agent_table(rows):
         .bind_visibility_from(table, 'selected', backward=lambda val: bool(val))
     
     return table
-
-def edit_page():
-    '''Edit Platform; Can edit anything that was inputted (agents, configs, names, etc.); Currently meant for one platform'''
-    
-    # Rows for agent selection table
-    agent_rows = []
-
-    num = 0
-    platforms_path = os.path.expanduser("~") + "/.volttron_installer/platforms/"
-    for platform_dir in os.listdir(platforms_path):
-        if os.path.isdir(platforms_path + platform_dir):
-            inventory = Inventory.read_inventory("inventory", platform_dir)
-            for host in range(len(inventory.hosts)):        
-                platform = Platform.read_platform_config(inventory.hosts[host], platform_dir)
-            
-            num += 1
-
-    # Update agent_rows so table shows correct data
-    for agent in platform.agents:
-        agent_rows.append({'name': agent.name, 'identity': agent.identity, 'config': str(agent.config)})
-
-    add_header()
-    # Output web address if checkbox was clicked
-    ui.label("Edit Platform").style("font-size: 26px")
-    with ui.row():
-        ui.label("Platform Name:")
-        platform_name = ui.input(label="Platform Name", value=platform.name)
-    ui.separator()
-    with ui.row():
-        ui.label("Hostname:")
-        hostname = ui.input(label="Hostname", value=platform.hostname)
-    ui.separator()
-    with ui.row():
-        ui.label("VIP Address:")
-        vip_address = ui.input(label="VIP Address", value=platform.vip_address)
-        if platform.bind_web_address is None:
-            web_address_checkbox = ui.checkbox("Use for Web Address (Only if web is enabled)")
-        else:
-            web_address_checkbox = ui.checkbox("Use for Web Address (Only if web is enabled)", value=True)
-        
-        ui.separator()
-    
-    table = agent_table(agent_rows)
-                       
-    return platform_name, hostname, vip_address, table, web_address_checkbox
     
 def platform_table():
     '''Table to display installed platforms; Allows editing of platforms and agents'''
     platform_columns = [
         {'name': 'name', 'label': 'Name', 'field': 'name', 'sortable': True},
-        {'name': 'hostname', 'label': 'Hostname', 'field': 'hostname'},
-        {'name': 'vip_address', 'label': 'VIP Address', 'field': 'vip_address'},
-        {'name': 'web_address', 'label': 'Web Address', 'field': 'web_address', 'required': False},
         {'name': 'num_agents', 'label': '# of Agents', 'field': 'num_agents'}
     ]
 
@@ -654,13 +605,15 @@ def platform_table():
     for platform_dir in os.listdir(platforms_path):
         if os.path.isdir(platforms_path + platform_dir):
             inventory = Inventory.read_inventory("inventory", platform_dir)
-            for host in range(len(inventory.hosts)):        
-                platform = Platform.read_platform_config(inventory.hosts[host], platform_dir)
-                if platform.bind_web_address == None:
-                    platform_rows.append({'name': platform.name, 'hostname': platform.hostname, 'vip_address': platform.vip_address, 'web_address': 'None', 'num_agents': len(platform.agents)})
-                else:
-                    platform_rows.append({'name': platform.name, 'hostname': platform.hostname, 'vip_address': platform.vip_address, 'web_address': platform.bind_web_address, 'num_agents': len(platform.agents)})
-            
+            platform = Platform.read_platform_config(inventory.hosts, platform_dir)
+
+            num_agents = 0
+            for agent_list in platform.agents:
+                for agent in agent_list:
+                    num_agents += 1
+
+            platform_rows.append({'name': platform.name, 'num_agents': num_agents})
+        
             num += 1
 
     table = ui.table(title="Platforms", columns=platform_columns, rows=platform_rows, row_key="name", selection="single")
@@ -682,8 +635,8 @@ def home_page():
         platform_str = platform.replace("'", "\"")
         platform_list = json.loads(platform_str)
         original_platform_name = platform_list[0]['name']
-        
-        ui.open(f"http://127.0.0.1:8080/edit/{original_platform_name}")
+
+        ui.open(f"http://127.0.0.1:8080/edit/{original_platform_name + '?update=False'}")
 
     def handle_confirm_remove(original_platform_name: str, dialog):
         '''Handles on_click event when user confirms the removal of a platform'''
@@ -720,7 +673,7 @@ def home_page():
         label = ui.label().bind_text_from(table, 'selected', lambda val: str(val))
 
 
-def add_host(platform_name: str, host_list: list):
+def add_host(platform_name: str, host_list: list, platform_temp: Optional[Platform] = None):
     '''Adds host to host list and opens configuration page for that host'''
     if host_list == []:
         hostname = "host1"
@@ -733,8 +686,8 @@ def add_host(platform_name: str, host_list: list):
 
 # Make a global platform obj that will be used so each host can append configurations to the overall platform
 platform = Platform(name="", hosts=[], vip_address=[], bind_web_address=[], agents=[])
-def save_host(platform_name: str, hostname: str, vip_address: str, checkbox: bool, table_rows: List[dict]):
-    '''Save host configuration and append values to an object'''
+def save_host_create(platform_name: str, hostname: str, vip_address: str, checkbox: bool, table_rows: List[dict]):
+    '''Save host configuration and append values to an object; Called when host is added on create page'''
     agent_list = []
     for agent in table_rows:
         for num in range(0, 16):
@@ -753,10 +706,10 @@ def save_host(platform_name: str, hostname: str, vip_address: str, checkbox: boo
                 )
                 agent_list.append(picked_agent)
 
-
     platform.name = platform_name
     platform.hosts.append(hostname)
     platform.vip_address.append(vip_address)
+    
     if checkbox is True:
         web_address = vip_address.replace(vip_address.split("://")[0], "http")
         platform.bind_web_address.append(web_address)
@@ -766,7 +719,42 @@ def save_host(platform_name: str, hostname: str, vip_address: str, checkbox: boo
     platform.agents.append(agent_list)
     ui.open(create)
 
-def save_host_edit(host: str, platform_name: str, new_hostname: str, vip_address: str, checkbox_value: bool, table_rows: List[dict]):
+def save_host_edit(platform_name: str, hostname: str, vip_address: str, checkbox: bool, table_rows: List[dict]):
+    '''Save host configuration and append values to an object; Called when adding a host on edit page'''
+
+    inventory = Inventory.read_inventory("inventory", platform_name) 
+    global platform
+    platform = Platform.read_platform_config(inventory.hosts, platform_name)
+
+    agent_list = []
+    for agent in table_rows:
+        for num in range(0, 16):
+            if list(AgentName)[num].value in agent['name']:
+                agent["source"] = list(AgentSource)[num].value
+
+                # Append to list of agents
+                picked_agent = Agent(
+                    name=agent["name"],
+                    identity=agent["identity"],
+                    source=agent["source"],
+                    config=agent["config"]
+                )
+                agent_list.append(picked_agent)
+
+    platform.hosts.append(hostname)
+    platform.vip_address.append(vip_address)
+    
+    if checkbox is True:
+        web_address = vip_address.replace(vip_address.split("://")[0], "http")
+        platform.bind_web_address.append(web_address)
+    else:
+        platform.bind_web_address.append(None)
+
+    platform.agents.append(agent_list)
+    ui.open(f"http://127.0.0.1:8080/edit/{platform_name + '?update=True'}")
+
+def change_host(caller: str, host: str, platform_name: str, new_hostname: str, vip_address: str, checkbox_value: bool, table_rows: List[dict]):
+    '''Updates values of host that user was editing'''
     for index, hostname in enumerate(platform.hosts):
         if hostname == host:
             agent_list = []
@@ -796,13 +784,118 @@ def save_host_edit(host: str, platform_name: str, new_hostname: str, vip_address
             
             platform.agents[index] = agent_list
         
-    print(platform)
-        
-    ui.open(create)
+    if caller == "create":    
+        ui.open(create)
+    elif caller == "edit":
+        ui.open(f"http://127.0.0.1:8080/edit/{platform_name + '?update=True'}")
 
+def remove_host(hostname):
+    for index, host in enumerate(platform.hosts):
+        if host == hostname:
+            platform.hosts.pop(index)
+            platform.vip_address.pop(index)
+            platform.bind_web_address.pop(index)
+            platform.agents.pop(index)
+
+def remove_host_card(caller):
+    '''Display card for host selection for removal'''
+    columns = [
+        {'name': 'name', 'label': 'Name', 'field': 'name', 'required': True}
+    ]
+    rows = []
+
+    def handle_host_removal(hostname, confirm_dialog, table_dialog):
+        '''Handles on_click event when user confirms the removal of a platform'''
+        # Remove row where platform was being displayed
+        table.remove_rows(*table.selected)
+        table.selected.clear()
+
+        remove_host(hostname)
+
+        dialog.close()
+        table_dialog.close()
+
+        if caller == "edit":
+            edit_page.refresh()
+        elif caller == "create":
+            create_page.refresh()
+
+
+
+    def confirm_remove(host, table_dialog):
+        '''Confirmation of host removal'''
+        # Get old platform name for overriding
+        host_str = host.replace("'", "\"")
+        host_list = json.loads(host_str)
+        hostname = host_list[0]['name']
+
+        with ui.dialog() as dialog, ui.card():
+            ui.label("Confirm?").style("font-size: 20px")
+            ui.label(f"Are you sure you want to remove {hostname}? This action cannot be undone.")
+
+            with ui.row():
+                ui.button("Cancel", on_click=dialog.close)
+                ui.button("Confirm", on_click=lambda: handle_host_removal(hostname, dialog, table_dialog))
+
+        dialog.open()
+        
+    for host in platform.hosts:
+        rows.append({'name': host})
+
+    with ui.dialog() as dialog, ui.card():
+        table = ui.table(title="Hosts", columns=columns, rows=rows, row_key="name", selection="single")
+
+        with ui.row():
+            ui.button("Cancel", on_click=lambda: dialog.close())
+            ui.button("Remove Platform", on_click=lambda: confirm_remove(label.text, dialog)).bind_visibility_from(table, "selected", backward=lambda val: bool(val))
+    
+        with ui.row():
+            ui.label("Current Selection:")
+            label = ui.label().bind_text_from(table, 'selected', lambda val: str(val))
+    dialog.open()
+
+@ui.refreshable
+def edit_page(original_platform_name: str, update: str):
+    '''Edit Platform; Can edit anything that was inputted (agents, configs, names, etc.)'''
+    global host_list
+    host_list = []
+
+    global platform
+    if update == "False":
+        inventory = Inventory.read_inventory("inventory", original_platform_name) 
+        platform = Platform.read_platform_config(inventory.hosts, original_platform_name)
+    elif update == "True":
+        platform = globals()['platform']
+
+    add_header()
+
+    ui.label("Edit Platform").style("font-size: 26px")
+
+    ui.label("Enter the name of the platform.")
+    platform_name = ui.input(label="Platform Name", value=platform.name)
+    ui.separator()
+
+    ui.label("Hosts").style("font-size: 18px")
+    ui.label("Click 'Add Host' to add host and 'Remove Host(s)' to select which host to remove.")
+    with ui.row():
+        if platform.hosts == []:
+            ui.label("There are currently no hosts")
+        else:
+            for host in platform.hosts:
+                ui.link(host, f'/edit/{platform_name.value}/{host + "?caller=edit"}')
+                host_list.append(host)
+
+        ui.button("Add Host", on_click=lambda: add_host(platform_name.value, host_list, platform))
+        ui.button("Remove Host(s)", on_click=lambda: remove_host_card("edit"))
+
+    ui.separator()
+
+@ui.refreshable
 def create_page():
     '''Platform name and option to add multiple hosts; Clicking "Add Host" will open new page for configuration'''
     
+    add_header()
+
     ui.label("Create Platform").style("font-size: 26px")
 
     ui.label("Enter the name of the volttron platform.")
@@ -815,9 +908,10 @@ def create_page():
             ui.label("There are currently no hosts")
         else:
             for host in platform.hosts:
-                ui.link(host, f'/edit/{platform_name.value}/{host}')
+                ui.link(host, f'/edit/{platform_name.value}/{host + "?caller=create"}')
 
         ui.button("Add Host", on_click=lambda: add_host(platform_name.value, host_list))
+        ui.button("Remove Host(s)", on_click=lambda: remove_host_card("create"))
     ui.separator()
 
 # Pages; Howto still needs to be developed
@@ -830,12 +924,16 @@ def index():
         default_home_page()
 
 @ui.page("/confirm/{old_platform_name}")
-def confirm(old_platform_name: Optional[str] = None):
+def confirm(old_platform_name: str):
     if old_platform_name == "{old_platform_name}":
         confirm_platform()
+    else:
+        confirm_platform(old_platform_name)
+    
 
 @ui.page("/create")
 def create():
+    host_list = []
     create_page()
 
     with ui.row():
@@ -860,11 +958,20 @@ def create_host(platform_name: str, hostname: str):
     ui.label("Pick your agent and overwrite the default configuration/identity if needed")
     table = agent_table(agent_rows)
 
-    with ui.row():
-        ui.button("Save Host", on_click=lambda: save_host(platform_name, new_hostname.value, address.value, web_address_checkbox.value, table.rows))
+    if os.listdir(os.path.expanduser("~") + "/.volttron_installer/platforms"):
+        with ui.row():
+            for platform_dir in os.listdir(os.path.expanduser("~") + "/.volttron_installer/platforms/"):
+                if platform_dir == platform_name:
+                    ui.button("Save Host (Edit)", on_click=lambda: save_host_edit(platform_name, new_hostname.value, address.value, web_address_checkbox.value, table.rows))
+                else:
+                    ui.button("Save Host", on_click=lambda: save_host_create(platform_name, new_hostname.value, address.value, web_address_checkbox.value, table.rows))
+    else:
+        with ui.row():
+            ui.button("Save Host", on_click=lambda: save_host_create(platform_name, new_hostname.value, address.value, web_address_checkbox.value, table.rows))
+
 
 @ui.page("/edit/{platform_name}/{hostname}")
-def edit_host(platform_name: str, hostname: str):
+def edit_host(platform_name: str, hostname: str, caller: str):
     for index, host in enumerate(platform.hosts):
         if host == hostname:
             agent_rows = []
@@ -890,16 +997,15 @@ def edit_host(platform_name: str, hostname: str):
 
             ui.label("Pick your agent and overwrite the default configuration/identity if needed")
             table = agent_table(agent_rows)
-
-            ui.button("Save Changes to Host", on_click=lambda: save_host_edit(host, platform_name, new_hostname.value, address.value, web_address_checkbox.value, table.rows))
+            
+            ui.button("Save Changes to Host", on_click=lambda: change_host(caller, hostname, platform_name, new_hostname.value, address.value, web_address_checkbox.value, table.rows))
 
 @ui.page("/edit/{orig_platform_name}")
-def edit(orig_platform_name):
-    add_header()
-    platform_name_obj, hostname_obj, vip_address_obj, agent_table_obj, checkbox = edit_page()
+def edit(orig_platform_name: str, update: str):
+    edit_page(orig_platform_name, update)
 
     with ui.row():
-        ui.button("Save Platform", on_click=lambda: confirm_platform("Save Configuration", platform_name_obj, hostname_obj, vip_address_obj, agent_table_obj, checkbox, orig_platform_name))
+        ui.button("Save Platform", on_click=lambda: ui.open(f"http://127.0.0.1:8080/confirm/{orig_platform_name}"))
 
 @ui.page("/howto")
 def howto():
