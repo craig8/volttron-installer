@@ -245,61 +245,84 @@ class Agent:
     config: str
 
 @dataclass
-class Platform:
-    '''Class for Platform and to Create Platform Configuration; Currently meant for one platform '''
-    hostname: str = "localhost"
-    instances: List[str] = field(default_factory=[])
-    vip_address: List[str] = "tcp://127.0.0.1:22916"
-    bind_web_address: Optional[List[str]] = field(default_factory=[])
-    agents: List[List[Agent]] = field(default_factory=[])
+class Instance:
+    '''Class for an Instance'''
+    name: str
+    vip_address: str = "tcp://127.0.0.1:22916"
+    bind_web_address: Optional[str] = None
+    agents: List[Agent] = field(default_factory=[])
 
-    def write_platform_config(self, instances: List[str]):
+    def write_platform_config(self):
         '''Write Platform Config File'''
-        for index, instance in enumerate(instances):
-            if self.bind_web_address[index] is not None:
-                platform_dict = {
-                    "config": {
-                        "vip_address": self.vip_address[index],
-                        "bind_web_address": self.bind_web_address[index],
-                    },
-                    "agents": {}
-                }
-            else:
-                platform_dict = {
-                    "config": {
-                        "vip_address": self.vip_address[index],
-                    },
-                    "agents": {}
-                }
+        if self.bind_web_address is not None:
+            platform_dict = {
+                "config": {
+                    "vip_address": self.vip_address,
+                    "bind_web_address": self.bind_web_address,
+                },
+                "agents": {}
+            }
+        else:
+            platform_dict = {
+                "config": {
+                    "vip_address": self.vip_address,
+                },
+                "agents": {}
+            }
 
-            # Loop through selected agents to write their configurations
-            for agent in self.agents[index]:
-                platform_dict['agents'].update({
-                    agent.identity: {
-                        "agent_source": agent.source,
-                        "agent_config": agent.config,
-                        "agent_running": True,
-                        "agent_enabled": True
-                    }
-                })
+        os.makedirs(os.path.expanduser("~") + f"/.volttron_installer/platforms/{self.name}", exist_ok=True)
+        os.makedirs(os.path.expanduser("~") + f"/.volttron_installer/platforms/{self.name}/agent_configs", exist_ok=True)
 
-            with open(os.path.expanduser("~") + f'/.volttron_installer/platforms/{instance}/{instance}.yml', 'w') as platform_config_file:
-                dump(platform_dict, platform_config_file)
+        for agent in self.agents:
+            for num in range(0, 16):
+                if list(AgentName)[num].value == agent.name:
+                    config_str = str(agent.config)
+                    config = config_str.replace("'", "\"").replace("False", "false").replace("True", "true").replace("None", "null") # Change single quotes to double so str can be converted to dict
+
+                    # Create agent config files
+                    id = agent.identity.replace(".", "_")
+                    with open(os.path.expanduser("~") + f'/.volttron_installer/platforms/{self.name}/agent_configs/{id}_config', 'w') as agent_config:
+                        agent_config.write(config)
+
+                    agent_config_path = os.path.expanduser("~") + f'/.volttron_installer/platforms/{self.name}/agent_configs/{id}_config'
+                    agent.config = agent_config_path
+                num += 1
+
+            platform_dict['agents'].update({
+                agent.identity: {
+                    "agent_source": agent.source,
+                    "agent_config": agent.config,
+                    "agent_running": True,
+                    "agent_enabled": True
+                }
+            })
+
+        with open(os.path.expanduser("~") + f'/.volttron_installer/platforms/{self.name}/{self.name}.yml', 'w') as platform_config_file:
+            dump(platform_dict, platform_config_file)
     
     @staticmethod
-    def read_platform_config(instances: List[str]) -> 'Platform':
+    def read_platform_config(instances: List[str]) -> 'Instance':
         '''Read Saved Platform Config File'''
-
-        platform_obj = Platform(hostname="", instances=[], vip_address=[], bind_web_address=[], agents=[])
+        machine_list = []
+        ip_list = []
+        instance_obj = Instance(name="", vip_address="", bind_web_address="", agents=[])
         
+        with open(os.path.expanduser("~/.volttron_installer/platforms/machines.yml"), 'r') as machines_config:
+            machines_dict = safe_load(machines_config.read())
+
+            for machine, ip in machines_dict['machines'].items():
+                machine_list.append(machine)
+                ip_list.append(ip['ip'])
+
         for instance in instances:
             agent_list = []
 
             with open(os.path.expanduser("~") + f'/.volttron_installer/platforms/{instance}/{instance}.yml', 'r') as platform_config_file:
                 platform_dict = safe_load(platform_config_file.read())
-                
+
             # Get variables needed for the platform object; Used for frontend
             vip_address = platform_dict['config']['vip_address']
+
             if 'bind_web_address' in platform_dict['config']:
                 bind_web_address = platform_dict['config']['bind_web_address']
             else:
@@ -317,12 +340,12 @@ class Platform:
                         picked_agent = Agent(name=agent_name, identity=agent_identity, source=config['agent_source'], config=agent_config)
                         agent_list.append(picked_agent)
 
-            platform_obj.instances.append(instance)
-            platform_obj.vip_address.append(vip_address)
-            platform_obj.bind_web_address.append(bind_web_address)
-            platform_obj.agents.append(agent_list)
+            instance_obj.name = instance
+            instance_obj.vip_address = vip_address
+            instance_obj.bind_web_address = bind_web_address
+            instance_obj.agents.append(agent_list)
 
-        return platform_obj
+        return instance_obj
             
 @dataclass
 class Inventory:
@@ -380,7 +403,7 @@ for count in range(len(list(AgentName))):
     agent_config_dict[list(AgentName)[count].value] = str(list(AgentConfig)[count].value)
 
 import pexpect # Move import when code is more finished
-def install_platform(q: Queue, platform: Platform, password: str):
+def install_platform(q: Queue, platform: Instance, password: str):
     '''Installs platform and updates progress bar as processes are finished'''
     create_files(platform)
     q.put_nowait(20) # Update progress bar
@@ -433,7 +456,7 @@ def install_platform(q: Queue, platform: Platform, password: str):
 
     #q.put_nowait(100)
 
-def create_files(platform: Platform):    
+def create_files(platform: Instance):    
     '''Add sources to selected agents, create objects of those agents, append those objects to a list, and create config files'''
     
     # Create parent directory that any other file created will sit in for utilization; Make directories for agent configuration files and so ansible expects localhost.yml in correct location; Currently for one platform
@@ -618,7 +641,7 @@ def platform_table():
         if os.path.isdir(platforms_path + instance_dir):
             instance_list.append(instance_dir)
             inventory = Inventory.read_inventory("inventory")
-            platform = Platform.read_platform_config(inventory.hosts, instance_dir)
+            platform = Instance.read_platform_config(inventory.hosts)
             platform.hostname = inventory.hostname
 
             print(platform)
@@ -782,7 +805,6 @@ def add_instance(platform_name: str, hostname: str, instance_list: list):
         ui.open(f"http://127.0.0.1:8080/create/{platform_name}/{hostname}/{instance_name}")
 
 # Make a global platform obj that will be used so each host can append configurations to the overall platform
-platform = Platform(hostname="", instances=[], vip_address=[], bind_web_address=[], agents=[])
 def save_instance_create(platform_name: str, hostname: str, instance_name: str, vip_address: str, checkbox: bool, table_rows: List[dict]):
     '''Save instance configuration and append values to an object; Called when instance is added on create page'''
     agent_list = []
@@ -852,43 +874,48 @@ def save_instance_edit(platform_name: str, hostname: str, old_instance_name, ins
     platform.agents.append(agent_list)
     ui.open(f"http://127.0.0.1:8080/edit/{platform_name + '?update=True'}")
 
-def change_instance(caller: str, hostname: str, platform_name: str, new_instance_name: str, vip_address: str, checkbox_value: bool, table_rows: List[dict]):
-    '''Updates values of instance that user was editing'''
-    for index, instance in enumerate(platform.instances):
-        if instance == new_instance_name:
-            agent_list = []
-            for agent in table_rows:
-                for num in range(0, 16):
-                    if list(AgentName)[num].value in agent['name']:
-                        agent["source"] = list(AgentSource)[num].value
-                        picked_agent = Agent(
-                            name=agent["name"],
-                            identity=agent["identity"],
-                            source=agent["source"],
-                            config=agent["config"]
-                        )
-                agent_list.append(picked_agent)
-            
-            # Update values
-            platform.name = platform_name
-            platform.hostname = hostname
-            platform.instances[index] = new_instance_name
-            platform.vip_address[index] = vip_address
+def change_instance(new_instance_name: str, selected_machine: str, checkbox: bool, port: int, machine_list: list, ip_list: list, table_rows: List[dict]):
+    '''Saves instance that user created/edited'''
+    instance = Instance(name="", vip_address="", bind_web_address=None, agents=[])
+    agent_list = []
+    for agent in table_rows:
+        for num in range(0, 16):
+            if list(AgentName)[num].value in agent['name']:
+                agent["source"] = list(AgentSource)[num].value
+                picked_agent = Agent(
+                    name=agent["name"],
+                    identity=agent["identity"],
+                    source=agent["source"],
+                    config=agent["config"]
+                )
+        agent_list.append(picked_agent)
+    
+    if checkbox == False:
+        for index, machine in enumerate(machine_list):
+            if machine == selected_machine:
+                ip_address = ip_list[index]
+                instance.vip_address = f"tcp://{ip_address}:22916"
+    else:
+        ip_address = "0.0.0.0"
+        instance.vip_address = f"tcp://{ip_address}:{port}"
+    
+    instance.name = new_instance_name
+    instance.vip_address = f"tcp://{ip_address}:22916"
+    instance.bind_web_address = None
+    instance.agents = agent_list
 
-            if checkbox_value is True:
-                web_address = vip_address.replace(vip_address.split("://")[0], "http")
-                platform.bind_web_address[index] = web_address
-            else:
-                web_address = None
-                platform.bind_web_address[index] = web_address
-            
-            platform.agents[index] = agent_list
-        
-    if caller == "create":    
-        ui.open(create)
-    elif caller == "edit":
-        ui.open(f"http://127.0.0.1:8080/edit/{platform_name + '?update=True'}")
-
+    instance.write_platform_config()
+    
+    instance_list = []
+    for instance_dir in os.listdir(os.path.expanduser("~/.volttron_installer/platforms")):
+        if os.path.isdir(os.path.expanduser(f"~/.volttron_installer/platforms/{instance_dir}")):
+            print(instance_dir)
+            instance_list.append(str(instance_dir))
+    
+    print(instance_list)
+    inventory = Inventory(hosts=instance_list)
+    inventory.write_inventory("inventory")
+    
 def remove_instance(instance_name):
     global platform
     for index, instance in enumerate(platform.instances):
@@ -968,7 +995,6 @@ def edit_page(original_platform_name: str, update: str):
     host_list = []
 
     global platform
-    print(platform)
     if update == "False":
         if instance_list == []:
             for instance_dir in os.listdir(os.path.expanduser("~") + "/.volttron_installer/platforms/" + original_platform_name):
@@ -1056,7 +1082,7 @@ def machines():
     rows = []
     inventory = Inventory.read_inventory("inventory")
     global platform
-    platform = Platform.read_platform_config(inventory.hosts)
+    platform = Instance.read_platform_config(inventory.hosts)
 
     add_header()
     ui.label("Enter your machine name and ip address and add them to the table")
@@ -1077,15 +1103,16 @@ def instances():
     rows = []
     inventory = Inventory.read_inventory("inventory")
     global platform
-    platform = Platform.read_platform_config(inventory.hosts)
+    platform = Instance.read_platform_config(inventory.hosts)
 
     add_header()
     ui.label("Add an instance by entering its name and edit an instance through the table")
 
-    for instance in platform.instances:
+    for instance in inventory.hosts:
         rows.append({'name': str(instance)})
     
     table = instance_table(rows)
+
 @ui.page("/create")
 def create(caller: Optional[str] = None):
     host_list = []
@@ -1126,16 +1153,28 @@ def create_host(platform_name: str, hostname: str, instance_name: str):
 
 @ui.page("/edit/{instance_name}")
 def edit_instance(instance_name: str):
+    '''Page where users can edit instance that the user picked'''
     agent_rows = []
     machine_list = []
     ip_list = []
+
     if os.path.exists(os.path.expanduser(f"~/.volttron_installer/platforms/{instance_name}")):
         with open(os.path.expanduser(f"~/.volttron_installer/platforms/{instance_name}/{instance_name}.yml"), "r") as instance_config:
             instance_dict = safe_load(instance_config.read())
+
+        for agent, config in instance_dict['agents'].items():
+            with open(config['agent_config'], 'r') as config_file:
+                config = safe_load(config_file.read())
+            for num in range(0,16):
+                if agent == list(AgentIdentity)[num].value:
+                    agent_name = list(AgentName)[num].value
+    
+            agent_rows.append({'name': agent_name, 'identity': agent, 'config': str(config)})
+    else:
+        agent_rows = []
     
     with open(os.path.expanduser("~/.volttron_installer/platforms/machines.yml"), "r") as machines_config:
         machines_dict = safe_load(machines_config.read())
-        print(machines_dict)
 
         for machine, ip in machines_dict['machines'].items():
             machine_list.append(machine)
@@ -1148,24 +1187,19 @@ def edit_instance(instance_name: str):
     ui.separator()
 
     ui.label("Pick which machine this instance will be hosted on")
-    machine_select = ui.select(machine_list, value="localhost")
+    with ui.row():
+        selected_machine = ui.select(machine_list, value="localhost")
+        ip_checkbox = ui.checkbox("Bind to all IP's?")
+    ui.separator()
 
-    for agent, config in instance_dict['agents'].items():
-        with open(config['agent_config'], 'r') as config_file:
-            config = safe_load(config_file.read())
-        print(agent)
-        print(config)
-        for num in range(0,16):
-            if agent == list(AgentIdentity)[num].value:
-                agent_name = list(AgentName)[num].value
-
-        agent_rows.append({'name': agent_name, 'identity': agent, 'config': str(config)})
-        print(agent_rows)
+    ui.label("Specify what port the instance is hosted on").bind_visibility_from(ip_checkbox, "value")
+    port = ui.input("Port #", value="22916").bind_visibility_from(ip_checkbox, "value")
+    ui.separator().bind_visibility_from(ip_checkbox, "value")
 
     ui.label("Pick your agent and overwrite the default configuration/identity if needed")
     table = agent_table(agent_rows)
         
-    ui.button("Save Changes to Instance", on_click=lambda: change_instance(caller, hostname, platform_name, new_instance_name.value, address.value, web_address_checkbox.value, table.rows))
+    ui.button("Save Changes to Instance", on_click=lambda: change_instance(new_instance_name.value, selected_machine.value, ip_checkbox.value, port.value, machine_list, ip_list, table.rows))
 
 @ui.page("/edit/{orig_platform_name}")
 def edit(orig_platform_name: str, update: str):
