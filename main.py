@@ -343,7 +343,7 @@ class Instance:
         instance_obj.name = instance
         instance_obj.vip_address = vip_address
         instance_obj.bind_web_address = bind_web_address
-        instance_obj.agents.append(agent_list)
+        instance_obj.agents = agent_list
 
         return instance_obj
             
@@ -364,19 +364,11 @@ class Inventory:
         # Add multiple hosts with their address' to the inventory dictionary; Currently meant for one platform
         for host in self.hosts:
             count += 1
-            if host == "localhost":
-                inventory_dict['all']['hosts'].update({
-                    host: {
-                        "ansible_host": "localhost",
-                        "volttron_home": f"volttron_home{count}"
-                    }
-                })
-            else:
-                inventory_dict['all']['hosts'].update({
-                    host: {
-                        "volttron_home": f"volttron_home{count}"
-                    }
-                })
+            inventory_dict['all']['hosts'].update({
+                host: {
+                    "volttron_home": f"volttron_home{count}"
+                }
+            })
         
         with open(os.path.expanduser("~") + f"/.volttron_installer/platforms/{filename}.yml", 'w') as inventory_file:
             dump(inventory_dict, inventory_file)
@@ -403,9 +395,11 @@ for count in range(len(list(AgentName))):
     agent_config_dict[list(AgentName)[count].value] = str(list(AgentConfig)[count].value)
 
 import pexpect # Move import when code is more finished
-def install_platform(q: Queue, platform: Instance, password: str):
+def install_platform(q: Queue, instance_list: List[Instance], password: str):
     '''Installs platform and updates progress bar as processes are finished'''
-    create_files(platform)
+    for instance in instance_list:
+        print(instance)
+    create_files(instance_list)
     q.put_nowait(20) # Update progress bar
 
     ## Host Configuration; handles password input; Assumes password was entered correctly
@@ -456,39 +450,32 @@ def install_platform(q: Queue, platform: Instance, password: str):
 
     #q.put_nowait(100)
 
-def create_files(platform: Instance):    
-    '''Add sources to selected agents, create objects of those agents, append those objects to a list, and create config files'''
+def create_files(instance_list: List[Instance]):    
+    '''Create temporary inventory file that will serve as the inventory when a machine is deployed'''
+    global_inventory = Inventory.read_inventory("inventory")
     
-    # Create parent directory that any other file created will sit in for utilization; Make directories for agent configuration files and so ansible expects localhost.yml in correct location; Currently for one platform
-    os.makedirs(os.path.expanduser("~") + f"/.volttron_installer/platforms/", exist_ok=True)
+    inventory_dict = {
+        "all": {
+            "hosts": {}
+        }
+    }
 
-    for index, instance in enumerate(platform.instances):
-        os.makedirs(os.path.expanduser("~") + f"/.volttron_installer/platforms/{instance}", exist_ok=True)
-        os.makedirs(os.path.expanduser("~") + f"/.volttron_installer/platforms/{instance}/agent_configs", exist_ok=True)
+    for instance in instance_list:
+        if instance.name in global_inventory.hosts:
+            with open(os.path.expanduser("~/.volttron_installer/platforms/inventory.yml"), 'r') as inventory_file:
+                global_inventory_dict = safe_load(inventory_file.read())
+                print(global_inventory_dict)
+            volttron_home = global_inventory_dict['all']['hosts'][f'{instance.name}']['volttron_home']
 
-        for agent in platform.agents[index]:
-            for num in range(0, 16):
-                if list(AgentName)[num].value == agent.name:
-                    config_str = str(agent.config)
-                    config = config_str.replace("'", "\"").replace("False", "false").replace("True", "true").replace("None", "null") # Change single quotes to double so str can be converted to dict
+            inventory_dict['all']['hosts'].update({
+                instance.name: {
+                    "volttron_home": volttron_home
+                }
+            })
 
-                    # Create agent config files
-                    id = agent.identity.replace(".", "_")
-                    with open(os.path.expanduser("~") + f'/.volttron_installer/platforms/{instance}/agent_configs/{id}_config', 'w') as agent_config:
-                        agent_config.write(config)
+    with open(os.path.expanduser("~") + f"/.volttron_installer/platforms/temp_inventory.yml", 'w') as inventory_file:
+            dump(inventory_dict, inventory_file)
 
-                    agent_config_path = os.path.expanduser("~") + f'/.volttron_installer/platforms/{instance}/agent_configs/{id}_config'
-                    agent.config = agent_config_path
-                num += 1
-
-    # Create inventory file
-    inventory = Inventory(platform.instances)
-    inventory.write_inventory("inventory")
-
-    # Create platform configuration file after inventory;
-    platform.write_platform_config(inventory.hosts)
-    
-    return platform
 
 # --------------------------------------------- WEB SIDE ---------------------------------------------
 
@@ -499,7 +486,7 @@ AGENT_COLUMNS = [
     {'name': 'config', 'label': 'Configuration', 'field': 'config', 'required': False}
 ]
 
-def add_header():
+def add_header(page_name: str):
     '''Add header'''
     header_items = {
         'Home': '/',
@@ -510,7 +497,11 @@ def add_header():
     with ui.header():
         with ui.row():
             for title, target in header_items.items():
-                ui.link(title, target).classes(replace="text-lg text-white")
+                if title == page_name:
+                    ui.link(title, target).style("color: white; text-decoration: none; font-size: 16px; font-weight: bold")
+                else:
+                    ui.link(title, target).style("color: white; text-decoration: none; font-size: 16px")
+
 
 def update_choice(new_name, new_id, new_config): # Pass through objects
     '''Updates the values for identity and config input based on which agent was picked'''
@@ -552,8 +543,22 @@ def platform_table(rows: List[dict]):
         {'name': 'instances', 'label': 'Instance(s)', 'field': 'instances'},
     ]
 
-    table = ui.table(title="Platforms", columns=platform_columns, rows=rows)
+    def open_confirm_page(label: str):
+        '''Creates endpoint required for confirm page and opens confirm page'''
+        label_str = label.replace("'", "\"")
+        label_list = json.loads(label_str)
+        machine_name = label_list[0]['machine_name']
+
+        ui.open(f"http://127.0.0.1:8080/confirm/{machine_name}")
+
+    table = ui.table(title="Platforms", columns=platform_columns, rows=rows, row_key="machine_name", selection="single")
     
+    ui.button("Deploy Machine", on_click=lambda: open_confirm_page(label.text)).bind_visibility_from(table, 'selected', backward=lambda val: bool(val))
+    
+    with ui.row().bind_visibility_from(table, 'selected', backward=lambda val: bool(val)):
+        ui.label("Current Selection:")
+        label = ui.label().bind_text_from(table, 'selected', lambda val: str(val))
+
     return table
 
 def machine_table(rows):
@@ -639,7 +644,7 @@ def machine_table(rows):
                 new_ip = ui.input(label="IP Address")
 
     with ui.row().bind_visibility_from(table, 'selected', backward=lambda val: bool(val)):
-        ui.button('Remove', on_click=lambda: (remove_machine(label.text), ))
+        ui.button('Remove', on_click=lambda: remove_machine(label.text))
     
     with ui.row():
         ui.label("Current Selection:")
@@ -709,14 +714,14 @@ def instance_table(rows):
 
 def default_home_page():
     '''Default home page; called when no instances/machines exist'''
-    add_header()
+    add_header("Home")
     with ui.row():
         ui.label("There are no host machines added or instances installed.")
         ui.button("Add a Host Machine", on_click=lambda: ui.open("http://127.0.0.1:8080/machines"))
 
 def home_page():
     '''Home Page; called when instances/machines do exist'''
-    add_header()        
+    add_header("Home")        
 
     platform_rows = []
     machine_list = []
@@ -748,7 +753,13 @@ def home_page():
         instances = ', '.join(instance_list)
         platform_rows.append({'machine_name': machine, 'instances': instances})
 
+    ui.label("Deploy a machine by selecting one below or Add a Machine/Instance")
+    with ui.row():
+        ui.button("Add Machine", on_click=lambda: ui.open("http://127.0.0.1:8080/machines"))
+        ui.button("Add Instance", on_click=lambda: ui.open("http://127.0.0.1:8080/instances"))
+
     table = platform_table(platform_rows)
+    
 
 def change_instance(old_instance_name: str, new_instance_name: str, selected_machine: str, checkbox: bool, port: int, machine_list: list, ip_list: list, table_rows: List[dict]):
     '''Saves instance that user created/edited'''
@@ -794,6 +805,85 @@ def change_instance(old_instance_name: str, new_instance_name: str, selected_mac
 
     ui.open("http://127.0.0.1:8080/instances")
 
+def confirm_platform(machine_name: str):
+    '''Page that will show selected machine/instances; can be either one machine or all machines. Can be submitted for installation of those instances'''
+    instance_list = []
+
+    
+    with open(os.path.expanduser("~/.volttron_installer/platforms/machines.yml"), 'r') as machines_file:
+        machines_dict = safe_load(machines_file.read())
+
+    for instance_dir in os.listdir(os.path.expanduser("~/.volttron_installer/platforms")):
+        if os.path.isdir(os.path.expanduser(f"~/.volttron_installer/platforms/{instance_dir}")):
+            with open(os.path.expanduser(f"~/.volttron_installer/platforms/{instance_dir}/{instance_dir}.yml"), 'r') as instance_file:
+                instance_dict = safe_load(instance_file.read())
+
+                if 'vip_address' in instance_dict['config']:
+                    parsed_url = urlparse(instance_dict['config']['vip_address'])
+                    ip = parsed_url.hostname
+
+                    if ip == machines_dict['machines'][f'{machine_name}']['ip']:
+                        instance = Instance.read_platform_config(instance_dir)
+                        instance_list.append(instance)
+                    elif ip == "0.0.0.0.":
+                        instance = Instance.read_platform_config(instance_dir)
+                        instance_list.append(instance)
+                    
+    async def start_installation():
+        '''Async event handler; Will install platform'''
+        progress.visible = True
+        loop = asyncio.get_running_loop()
+ 
+        await loop.run_in_executor(pool, install_platform, queue, instance_list, password.value)
+ 
+    queue = Manager().Queue()
+
+    # Output web address if checkbox was clicked
+    ui.label("Overview of Configuration").style("font-size: 26px")
+    with ui.row():
+        ui.label("Machine Name:")
+        ui.label(machine_name)
+    ui.separator()
+
+    with ui.row():
+        ui.label("IP Address:")
+        ui.label(machines_dict['machines'][f'{machine_name}']['ip'])
+    ui.separator()
+    
+    ui.label("Instances").style("font-size: 20px;")
+    for instance in instance_list:
+        rows = []
+        for agent in instance.agents:
+            rows.append({'name': agent.name, 'identity': agent.identity, 'config': str(agent.config)})
+
+        with ui.row():
+            ui.label("Instance Name:")
+            ui.label(instance.name)
+        ui.separator()
+
+        with ui.row():
+            ui.label("VIP Address:")
+            ui.label(instance.vip_address)
+        ui.separator()
+
+        with ui.row():
+            ui.label("Web Address:")
+            ui.label(str(instance.bind_web_address))
+        ui.separator()
+
+        with ui.row():
+            ui.table(title='Agents', columns=AGENT_COLUMNS, rows=rows)
+        ui.separator()
+        
+    ui.label("Enter your password then click 'Confirm' to start the installation process")
+    with ui.row():
+        password = ui.input(placeholder="Password", label="Password", password=True, password_toggle_button=True, validation={'Please enter your password': lambda value: value.strip()})
+        ui.button("Cancel", on_click=lambda: ui.open(index))
+        ui.button("Confirm", on_click=start_installation)
+        progress = ui.circular_progress(min=0, max=100, value=0, size="xl").props('instant-feedback')
+        progress.visible = False
+        
+    ui.timer(0.1, callback=lambda: progress.set_value(queue.get() if not queue.empty() else progress.value))
 # Pages; Howto still needs to be developed
 @ui.page("/")
 def index():
@@ -809,7 +899,6 @@ def index():
         os.makedirs(os.path.expanduser("~/.volttron_installer/platforms"))
         default_home_page()
     
-
 @ui.page("/machines")
 def machines():
     '''Page for adding and removing machines'''
@@ -821,7 +910,7 @@ def machines():
             for machine, ip in machines_dict['machines'].items():
                 rows.append({'name': str(machine), 'ip_address': str(ip['ip'])})
 
-    add_header()
+    add_header("Machines")
     ui.label("Enter your machine name and ip address and add them to the table")
     table = machine_table(rows)
 
@@ -837,7 +926,7 @@ def instances():
         for instance in inventory.hosts:
             rows.append({'name': str(instance)})
 
-    add_header()
+    add_header("Instances")
     ui.label("Add an instance by entering its name and edit an instance through the table")
     table = instance_table(rows)
 
@@ -908,6 +997,9 @@ def edit_instance(instance_name: str):
         
     ui.button("Save Changes to Instance", on_click=lambda: change_instance(instance_name, new_instance_name.value, selected_machine.value, ip_checkbox.value, port.value, machine_list, ip_list, table.rows))
 
+@ui.page("/confirm/{machine_name}")
+def confirm(machine_name: str):
+    confirm_platform(machine_name)
 
 app.on_shutdown(pool.shutdown)
 ui.run(title="VOLTTRON")
