@@ -361,7 +361,7 @@ class Inventory:
             }
         }
 
-        # Add multiple hosts with their address' to the inventory dictionary; Currently meant for one platform
+        # Add multiple hosts with their address' to the inventory dictionary;
         for host in self.hosts:
             count += 1
             inventory_dict['all']['hosts'].update({
@@ -399,6 +399,7 @@ def install_platform(q: Queue, instance_list: List[Instance], password: str):
     '''Installs platform and updates progress bar as processes are finished'''
     for instance in instance_list:
         print(instance)
+
     create_files(instance_list)
     q.put_nowait(20) # Update progress bar
 
@@ -464,7 +465,7 @@ def create_files(instance_list: List[Instance]):
         if instance.name in global_inventory.hosts:
             with open(os.path.expanduser("~/.volttron_installer/platforms/inventory.yml"), 'r') as inventory_file:
                 global_inventory_dict = safe_load(inventory_file.read())
-                print(global_inventory_dict)
+
             volttron_home = global_inventory_dict['all']['hosts'][f'{instance.name}']['volttron_home']
 
             inventory_dict['all']['hosts'].update({
@@ -475,7 +476,6 @@ def create_files(instance_list: List[Instance]):
 
     with open(os.path.expanduser("~") + f"/.volttron_installer/platforms/temp_inventory.yml", 'w') as inventory_file:
             dump(inventory_dict, inventory_file)
-
 
 # --------------------------------------------- WEB SIDE ---------------------------------------------
 
@@ -495,7 +495,7 @@ def add_header(page_name: str):
     }
 
     with ui.header():
-        with ui.row():
+        with ui.row():      
             for title, target in header_items.items():
                 if title == page_name:
                     ui.link(title, target).style("color: white; text-decoration: none; font-size: 16px; font-weight: bold")
@@ -539,27 +539,31 @@ def agent_table(rows):
 def platform_table(rows: List[dict]):
     '''Table to display installed machines/instances'''
     platform_columns = [
-        {'name': 'machine_name', 'label': 'Machine', 'field': 'machine_name', 'sortable': True},
-        {'name': 'instances', 'label': 'Instance(s)', 'field': 'instances'},
+        {'headerName': 'Machine',  'field': 'machine_name', 'sortable': True, 'checkboxSelection': True},
+        {'headerName': 'Instances', 'field': 'instances'},
+        {'headerName': 'Status',  'field': 'status'}
     ]
 
-    def open_confirm_page(label: str):
+    async def open_confirm_page():
         '''Creates endpoint required for confirm page and opens confirm page'''
-        label_str = label.replace("'", "\"")
-        label_list = json.loads(label_str)
-        machine_name = label_list[0]['machine_name']
 
-        ui.open(f"http://127.0.0.1:8080/confirm/{machine_name}")
-
-    table = ui.table(title="Platforms", columns=platform_columns, rows=rows, row_key="machine_name", selection="single")
+        row = await grid.get_selected_row()
+        if row:
+            machine_name = row['machine_name']
+            ui.open(f"http://127.0.0.1:8080/confirm/{machine_name}")
+        else:
+            ui.notify("A Machine was not Selected")
     
-    ui.button("Deploy Machine", on_click=lambda: open_confirm_page(label.text)).bind_visibility_from(table, 'selected', backward=lambda val: bool(val))
-    
-    with ui.row().bind_visibility_from(table, 'selected', backward=lambda val: bool(val)):
-        ui.label("Current Selection:")
-        label = ui.label().bind_text_from(table, 'selected', lambda val: str(val))
+    grid = ui.aggrid({
+        'defaultColDef': {'flex': 1},
+        'columnDefs': platform_columns,
+        'rowData': rows,
+        'rowSelection': 'single',
+    }, html_columns=[1]).classes('max-h-40')    
 
-    return table
+    ui.button("Deploy Machine", on_click=open_confirm_page)
+
+    return grid
 
 def machine_table(rows):
     '''Table to display existing machines; Allows for removal of machines'''
@@ -740,6 +744,7 @@ def home_page():
                 
     for index, machine in enumerate(machine_list):
         instance_list = []
+        link_str = ''
         for instance in inventory.hosts:
             if os.path.isdir(platforms_path + instance):
                 platform = Instance.read_platform_config(instance)
@@ -749,19 +754,25 @@ def home_page():
 
                 if ip_address == ip_list[index] or ip_address == "0.0.0.0":
                     instance_list.append(platform.name)
-                
-        instances = ', '.join(instance_list)
-        platform_rows.append({'machine_name': machine, 'instances': instances})
+        
+        for index, instance in enumerate(instance_list):
+            if index == len(instance_list) - 1:
+                link_str += f'<a href="http://127.0.0.1:8080/edit/{instance}">{instance}</a>'
+            else:
+                link_str += f'<a href="http://127.0.0.1:8080/edit/{instance}">{instance}</a>, '
 
-    ui.label("Deploy a machine by selecting one below or Add a Machine/Instance")
+        platform_rows.append({'machine_name': machine, 'instances': link_str, 'status': ''})
+
     with ui.row():
-        ui.button("Add Machine", on_click=lambda: ui.open("http://127.0.0.1:8080/machines"))
-        ui.button("Add Instance", on_click=lambda: ui.open("http://127.0.0.1:8080/instances"))
+        ui.label("Deploy a machine by selecting one below or Add a Machine/Instance")
+    with ui.row():
+        ui.button("Add Machine", on_click=lambda: ui.open("http://127.0.0.1:8080/machines")).tooltip("A device with an IP address that an instance can bind to.")
+        ui.button("Add Instance", on_click=lambda: ui.open("http://127.0.0.1:8080/instances")).tooltip("A VOLTTRON instance that allows for configuration.")
 
     table = platform_table(platform_rows)
     
 
-def change_instance(old_instance_name: str, new_instance_name: str, selected_machine: str, checkbox: bool, port: int, machine_list: list, ip_list: list, table_rows: List[dict]):
+def save_instance(old_instance_name: str, new_instance_name: str, selected_machine: str, checkbox: bool, port: int, machine_list: list, ip_list: list, table_rows: List[dict]):
     '''Saves instance that user created/edited'''
     instance = Instance(name="", vip_address="", bind_web_address=None, agents=[])
     agent_list = []
@@ -800,6 +811,7 @@ def change_instance(old_instance_name: str, new_instance_name: str, selected_mac
         if os.path.isdir(os.path.expanduser(f"~/.volttron_installer/platforms/{instance_dir}")):
             instance_list.append(str(instance_dir))
     
+    print(instance_list)
     inventory = Inventory(hosts=instance_list)
     inventory.write_inventory("inventory")
 
@@ -995,7 +1007,7 @@ def edit_instance(instance_name: str):
     ui.label("Pick your agent and overwrite the default configuration/identity if needed")
     table = agent_table(agent_rows)
         
-    ui.button("Save Changes to Instance", on_click=lambda: change_instance(instance_name, new_instance_name.value, selected_machine.value, ip_checkbox.value, port.value, machine_list, ip_list, table.rows))
+    ui.button("Save Changes to Instance", on_click=lambda: save_instance(instance_name, new_instance_name.value, selected_machine.value, ip_checkbox.value, port.value, machine_list, ip_list, table.rows))
 
 @ui.page("/confirm/{machine_name}")
 def confirm(machine_name: str):
