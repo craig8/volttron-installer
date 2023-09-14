@@ -245,31 +245,41 @@ class Agent:
     source: str
     config: str
 
+class CustomEncoder(json.JSONEncoder):
+    def default(self, object):
+        # Exclude attributes with None values
+        return {key: value for key, value in object.__dict__.items() if value is not None}
+    
 @dataclass
 class Instance:
     '''Class for an Instance'''
     name: str
+    message_bus: str
     vip_address: str = "tcp://127.0.0.1:22916"
     bind_web_address: Optional[str] = None
+    volttron_central_address: Optional[str] = None
+    web_ssl_cert: Optional[str] = None
+    web_ssl_key: Optional[str] = None
     agents: List[Agent] = field(default_factory=[])
 
     def write_platform_config(self):
         '''Write Platform Config File'''
+        platform_dict = {
+            "config": {
+                "vip-address": self.vip_address,
+                "message-bus": self.message_bus
+            },
+            "agents": {}
+        }
+
         if self.bind_web_address is not None:
-            platform_dict = {
-                "config": {
-                    "vip_address": self.vip_address,
-                    "bind_web_address": self.bind_web_address,
-                },
-                "agents": {}
-            }
-        else:
-            platform_dict = {
-                "config": {
-                    "vip_address": self.vip_address,
-                },
-                "agents": {}
-            }
+            platform_dict["config"].update({"bind-web-address": self.bind_web_address})
+        if self.volttron_central_address is not None:
+            platform_dict["config"].update({"volttron-central-address": self.volttron_central_address})
+        if self.web_ssl_cert is not None:
+            platform_dict["config"].update({"web-ssl-cert": self.web_ssl_cert})
+        if self.web_ssl_key is not None:
+            platform_dict["config"].update({"web-ssl-key": self.web_ssl_key})
 
         os.makedirs(os.path.expanduser("~") + f"/.volttron_installer/platforms/{self.name}", exist_ok=True)
         os.makedirs(os.path.expanduser("~") + f"/.volttron_installer/platforms/{self.name}/agent_configs", exist_ok=True)
@@ -306,7 +316,7 @@ class Instance:
         '''Read Saved Platform Config File'''
         machine_list = []
         ip_list = []
-        instance_obj = Instance(name="", vip_address="", bind_web_address="", agents=[])
+        instance_obj = Instance(name=instance, message_bus="", vip_address="", agents=[])
         
         with open(os.path.expanduser("~/.volttron_installer/platforms/machines.yml"), 'r') as machines_config:
             machines_dict = safe_load(machines_config.read())
@@ -320,15 +330,21 @@ class Instance:
             platform_dict = safe_load(platform_config_file.read())
 
         # Get variables needed for the platform object; Used for frontend
-        if 'vip_address' in platform_dict['config']:
-            vip_address = platform_dict['config']['vip_address']
-        else:
-            vip_address = None
+        instance_obj.vip_address = platform_dict['config']['vip-address']
+        instance_obj.message_bus = platform_dict['config']['message-bus']
 
-        if 'bind_web_address' in platform_dict['config']:
-            bind_web_address = platform_dict['config']['bind_web_address']
-        else:
-            bind_web_address = None
+        if 'bind-web-address' in platform_dict['config']:
+            instance_obj.bind_web_address = platform_dict['config']['bind-web-address']
+
+        if 'volttron-central-address' in platform_dict['config']:
+            instance_obj.volttron_central_address = platform_dict['config']['volttron-central-address']
+        
+        if 'web-ssl-cert' in platform_dict['config']:
+            instance_obj.web_ssl_cert = platform_dict['config']['web-ssl-cert']
+        
+        if 'web-ssl-key' in platform_dict['config']:
+            instance_obj.web_ssl_key = platform_dict['config']['web-ssl-key']
+
 
         for agent_identity, config in platform_dict['agents'].items():
             for num in range(0, 16):
@@ -340,9 +356,6 @@ class Instance:
                     picked_agent = Agent(name=agent_name, identity=agent_identity, source=config['agent_source'], config=agent_config)
                     agent_list.append(picked_agent)
 
-        instance_obj.name = instance
-        instance_obj.vip_address = vip_address
-        instance_obj.bind_web_address = bind_web_address
         instance_obj.agents = agent_list
 
         return instance_obj
@@ -392,15 +405,18 @@ agent_config_dict = {}
 for count in range(len(list(AgentName))):
     agent_name_list.append(list(AgentName)[count].value)
     agent_identity_dict[list(AgentName)[count].value] = list(AgentIdentity)[count].value
-    agent_config_dict[list(AgentName)[count].value] = str(list(AgentConfig)[count].value)
+
+    # Make config pretty print for display
+    config = str(list(AgentConfig)[count].value)
+    config = config.replace("'", "\"").replace("False", "false").replace("True", "true").replace("None", "null")
+    config_obj = json.loads(config)
+    config_str = json.dumps(config_obj, indent=2)
+    agent_config_dict[list(AgentName)[count].value] = config_str
 
 import pexpect # Move import when code is more finished
 def install_platform(q: Queue, instance_list: List[Instance], password: str):
     '''Installs platform and updates progress bar as processes are finished'''
-    for instance in instance_list:
-        print(instance)
-
-    create_files(instance_list)
+    print(instance_list)
     q.put_nowait(20) # Update progress bar
 
     ## Host Configuration; handles password input; Assumes password was entered correctly
@@ -451,40 +467,7 @@ def install_platform(q: Queue, instance_list: List[Instance], password: str):
 
     #q.put_nowait(100)
 
-def create_files(instance_list: List[Instance]):    
-    '''Create temporary inventory file that will serve as the inventory when a machine is deployed'''
-    global_inventory = Inventory.read_inventory("inventory")
-    
-    inventory_dict = {
-        "all": {
-            "hosts": {}
-        }
-    }
-
-    for instance in instance_list:
-        if instance.name in global_inventory.hosts:
-            with open(os.path.expanduser("~/.volttron_installer/platforms/inventory.yml"), 'r') as inventory_file:
-                global_inventory_dict = safe_load(inventory_file.read())
-
-            volttron_home = global_inventory_dict['all']['hosts'][f'{instance.name}']['volttron_home']
-
-            inventory_dict['all']['hosts'].update({
-                instance.name: {
-                    "volttron_home": volttron_home
-                }
-            })
-
-    with open(os.path.expanduser("~") + f"/.volttron_installer/platforms/temp_inventory.yml", 'w') as inventory_file:
-            dump(inventory_dict, inventory_file)
-
 # --------------------------------------------- WEB SIDE ---------------------------------------------
-
-# Columns for agent tables; Constant variable
-AGENT_COLUMNS = [
-    {'name': 'name', 'label': 'Name', 'field': 'name', 'required': True},
-    {'name': 'identity', 'label': 'Identity', 'field': 'identity', 'required': False},
-    {'name': 'config', 'label': 'Configuration', 'field': 'config', 'required': False}
-]
 
 def add_header(page_name: str):
     '''Add header'''
@@ -513,12 +496,18 @@ def update_choice(new_name, new_id, new_config): # Pass through objects
 
 def agent_table(rows):
     '''Table for selecting agents'''
-    with ui.table(title='Agents', columns=AGENT_COLUMNS, rows=rows, row_key='name', selection='multiple').classes('w-75') as table:
+    agent_columns = [
+        {'headerName': 'Name',  'field': 'agent_name', 'sortable': True, 'checkboxSelection': True},
+        {'headerName': 'Identity', 'field': 'identity'},
+        {'headerName': 'Configuration',  'field': 'config'}
+    ]
+
+    with ui.table(title='Agents', columns=agent_columns, rows=rows, row_key='name', selection='multiple').classes('w-75') as table:
         with table.add_slot('header'):
             with table.row():
                 with table.cell():
                     ui.button(on_click=lambda: (
-                        table.add_rows({'name': new_name.value, 'identity': new_id.value, 'config': new_config.value}),
+                        table.add_rows({'agent_name': new_name.value, 'identity': new_id.value, 'config': new_config.value}),
                         new_name.set_value(list(AgentName)[0].value),
                         new_id.set_value(list(AgentIdentity)[0].value),
                         new_config.set_value(str(list(AgentConfig)[0].value)),
@@ -529,12 +518,14 @@ def agent_table(rows):
                 with table.cell():
                     new_id = ui.input(label="Identity", value=agent_identity_dict[new_name.value])
                 with table.cell():
-                    new_config = ui.input(label="Configuration", value=agent_config_dict[new_name.value])
+                    new_config = ui.textarea(label="Configuration", value=agent_config_dict[new_name.value].strip())
 
     ui.button('Remove', on_click=lambda: table.remove_rows(*table.selected)) \
         .bind_visibility_from(table, 'selected', backward=lambda val: bool(val))
     
     return table
+    
+
     
 def platform_table(rows: List[dict]):
     '''Table to display installed machines/instances'''
@@ -671,7 +662,7 @@ def instance_table(rows):
         ui.open(f"http://127.0.0.1:8080/edit/{original_instance_name}")
     
     def add_instance(instance_name: str):
-        instance = Instance(name=instance_name, vip_address="", bind_web_address="", agents=[])
+        instance = Instance(name=instance_name, message_bus="", vip_address="", agents=[])
         instance.write_platform_config()
 
     def remove_instance(instance: str):
@@ -747,13 +738,13 @@ def home_page():
         link_str = ''
         for instance in inventory.hosts:
             if os.path.isdir(platforms_path + instance):
-                platform = Instance.read_platform_config(instance)
+                instance_obj = Instance.read_platform_config(instance)
 
-                parsed_url = urlparse(platform.vip_address)
+                parsed_url = urlparse(instance_obj.vip_address)
                 ip_address = parsed_url.hostname
 
                 if ip_address == ip_list[index] or ip_address == "0.0.0.0":
-                    instance_list.append(platform.name)
+                    instance_list.append(instance_obj.name)
         
         for index, instance in enumerate(instance_list):
             if index == len(instance_list) - 1:
@@ -772,16 +763,16 @@ def home_page():
     table = platform_table(platform_rows)
     
 
-def save_instance(old_instance_name: str, new_instance_name: str, selected_machine: str, checkbox: bool, port: int, machine_list: list, ip_list: list, table_rows: List[dict]):
+def save_instance(old_instance_name: str, new_instance_name: str, selected_machine: str, checkbox: bool, port: int, machine_list: list, ip_list: list, more_config: str, table_rows: List[dict]):
     '''Saves instance that user created/edited'''
-    instance = Instance(name="", vip_address="", bind_web_address=None, agents=[])
+    instance = Instance(name="", message_bus="", vip_address="", agents=[])
     agent_list = []
     for agent in table_rows:
         for num in range(0, 16):
-            if list(AgentName)[num].value in agent['name']:
+            if list(AgentName)[num].value in agent['agent_name']:
                 agent["source"] = list(AgentSource)[num].value
                 picked_agent = Agent(
-                    name=agent["name"],
+                    name=agent["agent_name"],
                     identity=agent["identity"],
                     source=agent["source"],
                     config=agent["config"]
@@ -798,20 +789,41 @@ def save_instance(old_instance_name: str, new_instance_name: str, selected_machi
         instance.vip_address = f"tcp://{ip_address}:{port}"
     
     instance.name = new_instance_name
-    instance.bind_web_address = None
     instance.agents = agent_list
+
+    lines = more_config.split("\n")
+    for line in lines:
+        if 'message-bus' in line:
+            instance.message_bus = line.split("=")[1].strip()
+        elif 'web-ssl-cert' in line:
+            instance.web_ssl_cert = line.split("=")[1].strip()
+        elif 'web-ssl-key' in line:
+            instance.web_ssl_key = line.split("=")[1].strip()
+        elif 'volttron-central-address' in line:
+            instance.volttron_central_address = line.split("=")[1].strip()
+        elif 'bind-web-address' in line:
+            instance.bind_web_address = line.split("=")[1].strip()
 
     if new_instance_name != old_instance_name:
         rmtree(os.path.expanduser(f"~/.volttron_installer/platforms/{old_instance_name}"))
 
+    # Write config files; Platform Configuration and config file that will rest in volttron home folder*
     instance.write_platform_config()
-    
+    #with open(os.path.expanduser(f"~/.volttron_installer/platforms/{instance.name}/config"), 'w') as config:
+    #    config.write("[volttron]")
+    #    config.write(f"instance-name = {instance.name}\n")
+    #    config.write(f"vip-address = {instance.vip_address}\n")
+    #    if instance.bind_web_address is not None:
+    #        config.write(f"bind-web-address = {instance.bind_web_address}\n")
+    #    config.write(more_config)
+
     instance_list = []
     for instance_dir in os.listdir(os.path.expanduser("~/.volttron_installer/platforms")):
         if os.path.isdir(os.path.expanduser(f"~/.volttron_installer/platforms/{instance_dir}")):
             instance_list.append(str(instance_dir))
     
-    print(instance_list)
+    instance_list.sort()
+
     inventory = Inventory(hosts=instance_list)
     inventory.write_inventory("inventory")
 
@@ -819,9 +831,13 @@ def save_instance(old_instance_name: str, new_instance_name: str, selected_machi
 
 def confirm_platform(machine_name: str):
     '''Page that will show selected machine/instances; can be either one machine or all machines. Can be submitted for installation of those instances'''
+    agent_columns = [
+        {'name': 'agent_name', 'label': 'Name', 'field': 'name'},
+        {'name': 'identity', 'label': 'Identity', 'field': 'identity'},
+        {'name': 'config', 'label': 'Configuration', 'field': 'config'},
+    ]
     instance_list = []
 
-    
     with open(os.path.expanduser("~/.volttron_installer/platforms/machines.yml"), 'r') as machines_file:
         machines_dict = safe_load(machines_file.read())
 
@@ -830,8 +846,8 @@ def confirm_platform(machine_name: str):
             with open(os.path.expanduser(f"~/.volttron_installer/platforms/{instance_dir}/{instance_dir}.yml"), 'r') as instance_file:
                 instance_dict = safe_load(instance_file.read())
 
-                if 'vip_address' in instance_dict['config']:
-                    parsed_url = urlparse(instance_dict['config']['vip_address'])
+                if 'vip-address' in instance_dict['config']:
+                    parsed_url = urlparse(instance_dict['config']['vip-address'])
                     ip = parsed_url.hostname
 
                     if ip == machines_dict['machines'][f'{machine_name}']['ip']:
@@ -851,17 +867,19 @@ def confirm_platform(machine_name: str):
     queue = Manager().Queue()
 
     # Output web address if checkbox was clicked
+
+    add_header("Confirm")
     ui.label("Overview of Configuration").style("font-size: 26px")
     with ui.row():
         ui.label("Machine Name:")
         ui.label(machine_name)
-    ui.separator()
 
     with ui.row():
         ui.label("IP Address:")
         ui.label(machines_dict['machines'][f'{machine_name}']['ip'])
     ui.separator()
     
+    print(instance_list)
     ui.label("Instances").style("font-size: 20px;")
     for instance in instance_list:
         rows = []
@@ -871,20 +889,38 @@ def confirm_platform(machine_name: str):
         with ui.row():
             ui.label("Instance Name:")
             ui.label(instance.name)
-        ui.separator()
 
         with ui.row():
             ui.label("VIP Address:")
             ui.label(instance.vip_address)
         ui.separator()
 
-        with ui.row():
-            ui.label("Web Address:")
-            ui.label(str(instance.bind_web_address))
+        more_config = ''
+        ui.label("Extra Configuration").style("font-size: 20px")
+        with ui.column():
+            with ui.row():
+                ui.label("Message Bus:")
+                ui.label(instance.message_bus)
+            if instance.bind_web_address:
+                with ui.row():
+                    ui.label("Bind Web Address:")
+                    ui.label(instance.bind_web_address)
+            if instance.volttron_central_address:
+                with ui.row():
+                    ui.label("Volttron Central Address:")
+                    ui.label(instance.volttron_central_address)
+            if instance.web_ssl_cert:
+                with ui.row():
+                    ui.label("Web SSL Certificate:")
+                    ui.label(instance.web_ssl_cert)
+            if instance.web_ssl_key:
+                with ui.row():
+                    ui.label("Web SSL Key:")
+                    ui.label(instance.web_ssl_key)
         ui.separator()
 
         with ui.row():
-            ui.table(title='Agents', columns=AGENT_COLUMNS, rows=rows)
+            ui.table(title='Agents', columns=agent_columns, rows=rows)
         ui.separator()
         
     ui.label("Enter your password then click 'Confirm' to start the installation process")
@@ -960,10 +996,13 @@ def edit_instance(instance_name: str):
             for num in range(0,16):
                 if agent == list(AgentIdentity)[num].value:
                     agent_name = list(AgentName)[num].value
-    
-            agent_rows.append({'name': agent_name, 'identity': agent, 'config': str(config)})
-        if 'vip_address' in instance_dict['config']:
-            vip_address = instance_dict['config']['vip_address']
+            
+            config = str(config).replace("'", "\"").replace("False", "false").replace("True", "true").replace("None", "null") # Change single quotes to double so str can be converted to dict
+            config_obj = json.loads(str(config))
+            config_str = json.dumps(config_obj, indent=2)
+            agent_rows.append({'agent_name': agent_name, 'identity': agent, 'config': config_str})
+        if 'vip-address' in instance_dict['config']:
+            vip_address = instance_dict['config']['vip-address']
 
             parsed_url = urlparse(vip_address)
             ip_address = parsed_url.hostname
@@ -1004,10 +1043,29 @@ def edit_instance(instance_name: str):
         ip_checkbox = ui.checkbox("Bind to all IP's?")
     ui.separator()
 
+    with ui.row():
+        ui.label("Enter more configuration below")
+        with ui.link(target="https://volttron.readthedocs.io/en/main/deploying-volttron/platform-configuration.html#volttron-config-file", new_tab=True):
+            with ui.icon("help_outline", color="black").style("text-decoration: none;"):
+                ui.tooltip("Need Help?")
+
+    combine_lines = ''
+    with open(os.path.expanduser(f"~/.volttron_installer/platforms/{instance_name}/{instance_name}.yml")) as instance_config:
+        instance_dict = safe_load(instance_config.read())
+        for key, value in instance_dict['config'].items():
+            if 'instance-name' in key or 'vip-address' in key:
+                pass
+            else:
+                line_str = f"{key} = {value}\n"
+                combine_lines += line_str
+        more_configs = ui.textarea(label='Extra Configuration', placeholder="Start typing...", value=combine_lines).style("width: 600px")
+
+    ui.separator()
+
     ui.label("Pick your agent and overwrite the default configuration/identity if needed")
     table = agent_table(agent_rows)
         
-    ui.button("Save Changes to Instance", on_click=lambda: save_instance(instance_name, new_instance_name.value, selected_machine.value, ip_checkbox.value, port.value, machine_list, ip_list, table.rows))
+    ui.button("Save Changes to Instance", on_click=lambda: save_instance(instance_name, new_instance_name.value, selected_machine.value, ip_checkbox.value, port.value, machine_list, ip_list, more_configs.value, table.rows))
 
 @ui.page("/confirm/{machine_name}")
 def confirm(machine_name: str):
