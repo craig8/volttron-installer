@@ -502,7 +502,7 @@ def agent_table(rows):
         {'headerName': 'Configuration',  'field': 'config'}
     ]
 
-    with ui.table(title='Agents', columns=agent_columns, rows=rows, row_key='name', selection='multiple').classes('w-75') as table:
+    with ui.table(title='Agents', columns=agent_columns, rows=rows, row_key='agent_name', selection='multiple').classes('w-75') as table:
         with table.add_slot('header'):
             with table.row():
                 with table.cell():
@@ -510,7 +510,7 @@ def agent_table(rows):
                         table.add_rows({'agent_name': new_name.value, 'identity': new_id.value, 'config': new_config.value}),
                         new_name.set_value(list(AgentName)[0].value),
                         new_id.set_value(list(AgentIdentity)[0].value),
-                        new_config.set_value(str(list(AgentConfig)[0].value)),
+                        new_config.set_value(agent_config_dict[new_name.value]),
                         table.update()
                     ), icon='add').props('flat fab-mini')
                 with table.cell():
@@ -879,7 +879,6 @@ def confirm_platform(machine_name: str):
         ui.label(machines_dict['machines'][f'{machine_name}']['ip'])
     ui.separator()
     
-    print(instance_list)
     ui.label("Instances").style("font-size: 20px;")
     for instance in instance_list:
         rows = []
