@@ -501,7 +501,21 @@ def agent_table(rows):
         {'headerName': 'Identity', 'field': 'identity'},
         {'headerName': 'Configuration',  'field': 'config'}
     ]
+    
+    def updateTable(agent_name: str, config: str):
+        for row in table.rows:
+            if agent_name == row['agent_name']:
+                row['config'] = config.strip()
+                table.selected.clear()
+                table.update()
 
+    def edit_config(row):
+        with ui.dialog() as dialog, ui.card():
+            ui.label(f"Edit Configuration for {row['agent_name']}")
+            config = ui.textarea(label="Agent Configuration", value=row['config']).style("width: 500px")
+
+            ui.button("Save Configuration of Agent", on_click=lambda: (updateTable(row['agent_name'], config.value), dialog.close()))
+        dialog.open()
     with ui.table(title='Agents', columns=agent_columns, rows=rows, row_key='agent_name', selection='multiple').classes('w-75') as table:
         with table.add_slot('header'):
             with table.row():
@@ -519,9 +533,9 @@ def agent_table(rows):
                     new_id = ui.input(label="Identity", value=agent_identity_dict[new_name.value])
                 with table.cell():
                     new_config = ui.textarea(label="Configuration", value=agent_config_dict[new_name.value].strip())
-
-    ui.button('Remove', on_click=lambda: table.remove_rows(*table.selected)) \
-        .bind_visibility_from(table, 'selected', backward=lambda val: bool(val))
+    with ui.row():
+        ui.button('Edit', on_click=lambda: edit_config(*table.selected)).bind_visibility_from(table, 'selected', backward=lambda val: bool(val))
+        ui.button('Remove', on_click=lambda: (table.remove_rows(*table.selected), table.selected.clear())).bind_visibility_from(table, 'selected', backward=lambda val: bool(val))
     
     return table
     
@@ -1063,7 +1077,6 @@ def edit_instance(instance_name: str):
 
     ui.label("Pick your agent and overwrite the default configuration/identity if needed")
     table = agent_table(agent_rows)
-        
     ui.button("Save Changes to Instance", on_click=lambda: save_instance(instance_name, new_instance_name.value, selected_machine.value, ip_checkbox.value, port.value, machine_list, ip_list, more_configs.value, table.rows))
 
 @ui.page("/confirm/{machine_name}")
