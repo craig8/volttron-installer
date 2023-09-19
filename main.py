@@ -244,11 +244,6 @@ class Agent:
     identity: str
     source: str
     config: str
-
-class CustomEncoder(json.JSONEncoder):
-    def default(self, object):
-        # Exclude attributes with None values
-        return {key: value for key, value in object.__dict__.items() if value is not None}
     
 @dataclass
 class Instance:
