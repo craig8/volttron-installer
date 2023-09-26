@@ -331,8 +331,10 @@ def main():
                 vip_address = instance_dict["config"]["vip-address"]
                 parsed_url = urlparse(vip_address)
                 ip_address = parsed_url.hostname
+                port_num = parsed_url.port
             else:
                 ip_address = None
+                port_num = None
         else:
             agent_rows = []
             ip_address = None
@@ -362,13 +364,25 @@ def main():
         ui.label("Pick which machine and port this instance will be hosted on")
         with ui.row():
             if ip_address is None:
+                    selected_machine = ui.select(machine_list, value=machine_list[0])
+                    port = ui.input("Port #", value="22916")
+                    ip_checkbox = ui.checkbox("Bind to all IP's?")
+            elif ip_address == "0.0.0.0":
                 selected_machine = ui.select(machine_list, value=machine_list[0])
-                port = ui.input("Port #", value="22916")
+                if port_num is None:
+                    port = ui.input("Port #", value="22916")
+                else:
+                    port = ui.input("Port #", value=port_num)
+                ip_checkbox = ui.checkbox("Bind to all IP's?", value=True)
             else:
                 selected_machine = ui.select(machine_list, value=machine)
-                port = ui.input("Port #", value="22916")
+                if port_num is None:
+                    port = ui.input("Port #", value="22916")
+                else:
+                    port = ui.input("Port #", value=port_num)
+                ip_checkbox = ui.checkbox("Bind to all IP's?")
 
-            ip_checkbox = ui.checkbox("Bind to all IP's?")
+
         ui.separator()
 
         with ui.row():
