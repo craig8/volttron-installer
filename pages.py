@@ -385,6 +385,12 @@ def main():
             for key, value in instance_dict["config"].items():
                 if "instance-name" in key or "vip-address" in key:
                     pass
+                elif "message-bus" in key:
+                    if value == "":
+                        pass
+                    else:
+                        line_str = f"{key} = {value}\n"
+                        combine_lines += line_str
                 else:
                     line_str = f"{key} = {value}\n"
                     combine_lines += line_str
