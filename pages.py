@@ -379,9 +379,7 @@ def main():
                     ui.tooltip("Need Help?")
 
         combine_lines = ""
-        with open(
-            os.path.expanduser(
-                f"~/.volttron_installer/platforms/{instance_name}/{instance_name}.yml")) as instance_config:
+        with open(os.path.expanduser(f"~/.volttron_installer/platforms/{instance_name}/{instance_name}.yml")) as instance_config:
             instance_dict = safe_load(instance_config.read())
 
             for key, value in instance_dict["config"].items():

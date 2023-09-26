@@ -201,7 +201,7 @@ def instance_table(rows):
         ui.open(f"http://127.0.0.1:8080/edit/{original_instance_name}")
 
     def add_instance(instance_name: str):
-        instance = classes.Instance(name=instance_name, message_bus="", vip_address="", agents=[])
+        instance = classes.Instance(name=instance_name, vip_address="", agents=[])
         instance.write_platform_config()
 
     def remove_instance(instance: str):
