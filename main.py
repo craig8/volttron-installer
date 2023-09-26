@@ -20,7 +20,7 @@ if not python_version.startswith("Python 3.10"):
     print("Python 3.10 has not been installed. Please install Python 3.10 before continuing.")
     print("Exiting...")
     sys.exit(1)
-    
+
 # Check if the required packages are installed; Install the packages if uninstalled
 print("Checking if the required packages are installed.")
 time.sleep(0.5)
@@ -167,4 +167,4 @@ print("Cloning volttron-installer repository so the web server can access requir
 Popen(["bash", "-c", "git clone --branch niceGUI https://github.com/VOLTTRON/volttron-installer.git"]).wait()
 
 # Start NiceGUI
-Popen(['bash', '-c', 'python3 pages.py']).wait()
+Popen(['bash', '-c', 'python3 volttron-installer/pages.py']).wait()
