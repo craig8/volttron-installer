@@ -8,7 +8,7 @@
 2. Ensure that curl is installed on the system by running `curl --version`
    - If curl is not installed, run `sudo apt install curl` to install it.
 ### Running the Script
-1. Run the command `python3 <(curl -sSL https://raw.githubusercontent.com/VOLTTRON/volttron-installer/develop/web.py)`
+1. Run the command `python3 <(curl -sSL https://raw.githubusercontent.com/VOLTTRON/volttron-installer/niceGUI/main.py)`
    - Installs the ansible, git, nicegui, pexpect, pip and python3.10-venv packages if they are not already installed.
    - Creates and activates a virtual environment in the directory where the script was ran.
    - Installs the volttron-ansible collection.
