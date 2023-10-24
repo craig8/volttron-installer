@@ -80,11 +80,15 @@ def platform_table(rows: List[dict]):
         """Creates endpoint required for confirm page and opens confirm page"""
 
         row = await grid.get_selected_row()
+
         if row:
-            machine_name = row["machine_name"]
-            ui.open(f"http://127.0.0.1:8080/confirm/{machine_name}")
+            if row["instances"] == "None":
+                ui.notify("Please assign an instance to the machine before deploying.")
+            else:
+                machine_name = row["machine_name"]
+                ui.open(f"http://127.0.0.1:8080/confirm/{machine_name}")
         else:
-            ui.notify("A Machine was not Selected")
+            ui.notify("A Machine was not Selected.")
 
     grid = ui.aggrid(
         {

@@ -93,7 +93,8 @@ def home_page():
 
     # Create and append table rows from inventory and platform config files
     platforms_path = os.path.expanduser("~") + "/.volttron_installer/platforms/"
-    inventory = classes.Inventory.read_inventory("inventory")
+    if os.path.exists(os.path.expanduser("~/.volttron_installer/platforms/inventory.yml")):
+        inventory = classes.Inventory.read_inventory("inventory")
 
     with open(os.path.expanduser("~/.volttron_installer/platforms/machines.yml"), "r") as machines_config:
         machines_dict = safe_load(machines_config.read())
@@ -105,24 +106,29 @@ def home_page():
     for index, machine in enumerate(machine_list):
         instance_list = []
 
-        link_str = ""
-        for instance in inventory.hosts:
-            if os.path.isdir(platforms_path + instance):
-                instance_obj = classes.Instance.read_platform_config(instance)
+        if os.path.exists(os.path.expanduser("~/.volttron_installer/platforms/inventory.yml")):
+            for instance in inventory.hosts:
+                if os.path.isdir(platforms_path + instance):
+                    instance_obj = classes.Instance.read_platform_config(instance)
 
-                parsed_url = urlparse(instance_obj.vip_address)
-                ip_address = parsed_url.hostname
+                    parsed_url = urlparse(instance_obj.vip_address)
+                    ip_address = parsed_url.hostname
 
-                if ip_address == ip_list[index] or ip_address == "0.0.0.0":
-                    instance_list.append(instance_obj.name)
-
-        for index, instance in enumerate(instance_list):
-            if index == len(instance_list) - 1:
-                link_str += (f'<a href="http://127.0.0.1:8080/edit/{instance}">{instance}</a>')
+                    if ip_address == ip_list[index] or ip_address == "0.0.0.0":
+                        instance_list.append(instance_obj.name)
+            if instance_list == []:
+                platform_rows.append({"machine_name": machine, "instances": "None", "status": ""})
             else:
-                link_str += (f'<a href="http://127.0.0.1:8080/edit/{instance}">{instance}</a>, ')
-
-        platform_rows.append({"machine_name": machine, "instances": link_str, "status": ""})
+                link_str = ""
+                for index, instance in enumerate(instance_list):
+                    if index == len(instance_list) - 1:
+                        link_str += (f'<a href="http://127.0.0.1:8080/edit/{instance}">{instance}</a>')
+                    else:
+                        link_str += (f'<a href="http://127.0.0.1:8080/edit/{instance}">{instance}</a>, ')
+    
+                platform_rows.append({"machine_name": machine, "instances": link_str, "status": ""})
+        else:
+            platform_rows.append({"machine_name": machine, "instances": "None", "status": ""})
 
     with ui.row():
         ui.label("Deploy a machine by selecting one below or Add a Machine/Instance")
@@ -253,15 +259,15 @@ def main():
     def index():
         """Checks for existing existing instances/machines and redirects to appropriate home page"""
 
-        # Check if any directories exist
+        # Check if base directories exist; Redirect to appropriate home page
         if os.path.exists(os.path.expanduser("~/.volttron_installer/platforms")):
-            if os.listdir(os.path.expanduser("~/.volttron_installer/platforms")):
+            if os.path.exists(os.path.expanduser("~/.volttron_installer/platforms/machines.yml")):
                 home_page()
             else:
                 default_home_page()
         else:
-            os.makedirs(os.path.expanduser("~/.volttron_installer"))
-            os.makedirs(os.path.expanduser("~/.volttron_installer/platforms"))
+            os.makedirs(os.path.expanduser("~/.volttron_installer"), exist_ok=True)
+            os.makedirs(os.path.expanduser("~/.volttron_installer/platforms"), exist_ok=True)
             default_home_page()
 
     @ui.page("/machines")
@@ -287,8 +293,7 @@ def main():
 
         rows = []
         # Create rows for instance table
-        if os.path.exists(
-            os.path.expanduser("~/.volttron_installer/platforms/inventory.yml")):
+        if os.path.exists(os.path.expanduser("~/.volttron_installer/platforms/inventory.yml")):
             inventory = classes.Inventory.read_inventory("inventory")
 
             for instance in inventory.hosts:
