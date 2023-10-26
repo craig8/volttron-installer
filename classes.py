@@ -48,15 +48,8 @@ class Instance:
         if self.web_ssl_key is not None:
             platform_dict["config"].update({"web-ssl-key": self.web_ssl_key})
 
-        os.makedirs(
-            os.path.expanduser("~") + f"/.volttron_installer/platforms/{self.name}",
-            exist_ok=True,
-        )
-        os.makedirs(
-            os.path.expanduser("~")
-            + f"/.volttron_installer/platforms/{self.name}/agent_configs",
-            exist_ok=True,
-        )
+        os.makedirs(os.path.expanduser("~") + f"/.volttron_installer/platforms/{self.name}", exist_ok=True)
+        os.makedirs(os.path.expanduser("~") + f"/.volttron_installer/platforms/{self.name}/agent_configs", exist_ok=True)
 
         for agent in self.agents:
             for num in range(0, 16):

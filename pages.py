@@ -62,17 +62,6 @@ def save_instance(old_instance_name: str, new_instance_name: str, selected_machi
 
     instance.write_platform_config()
 
-    instance_list = []
-
-    for instance_dir in os.listdir(os.path.expanduser("~/.volttron_installer/platforms")):
-        if os.path.isdir(os.path.expanduser(f"~/.volttron_installer/platforms/{instance_dir}")):
-            instance_list.append(str(instance_dir))
-
-    instance_list.sort()
-
-    inventory = classes.Inventory(hosts=instance_list)
-    inventory.write_inventory("inventory")
-
     ui.open("http://127.0.0.1:8080/instances")
 
 def default_home_page():
@@ -116,6 +105,7 @@ def home_page():
 
                     if ip_address == ip_list[index] or ip_address == "0.0.0.0":
                         instance_list.append(instance_obj.name)
+                        
             if instance_list == []:
                 platform_rows.append({"machine_name": machine, "instances": "None", "status": ""})
             else:
@@ -125,7 +115,7 @@ def home_page():
                         link_str += (f'<a href="http://127.0.0.1:8080/edit/{instance}">{instance}</a>')
                     else:
                         link_str += (f'<a href="http://127.0.0.1:8080/edit/{instance}">{instance}</a>, ')
-    
+
                 platform_rows.append({"machine_name": machine, "instances": link_str, "status": ""})
         else:
             platform_rows.append({"machine_name": machine, "instances": "None", "status": ""})

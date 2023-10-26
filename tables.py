@@ -204,9 +204,26 @@ def instance_table(rows):
 
         ui.open(f"http://127.0.0.1:8080/edit/{original_instance_name}")
 
-    def add_instance(instance_name: str):
-        instance = classes.Instance(name=instance_name, message_bus="", vip_address="", agents=[])
-        instance.write_platform_config()
+    def add_instance(instance_name: str, table):
+        if instance_name.strip() == "":
+            ui.notify("Please enter a name for the instance.")
+        else:
+            instance = classes.Instance(name=instance_name, message_bus="", vip_address="", agents=[])
+            instance.write_platform_config()
+
+            instance_list = []
+
+            for instance_dir in os.listdir(os.path.expanduser("~/.volttron_installer/platforms")):
+                if os.path.isdir(os.path.expanduser(f"~/.volttron_installer/platforms/{instance_dir}")):
+                    instance_list.append(str(instance_dir))
+        
+            instance_list.sort()
+        
+            inventory = classes.Inventory(hosts=instance_list)
+            inventory.write_inventory("inventory")
+
+            table.add_rows({"name": str(new_name.value)})
+            table.update()
 
     def remove_instance(instance: str):
         """Removes all files related to instance and removes instance from inventory"""
@@ -233,13 +250,11 @@ def instance_table(rows):
                 with table.cell():
                     ui.button(
                         on_click=lambda: (
-                            table.add_rows({"name": str(new_name.value)}),
-                            add_instance(new_name.value),
+                            add_instance(new_name.value, table),
                             new_name.set_value(""),
-                            table.update(),
                         ), icon="add").props("flat fab-mini")
                 with table.cell():
-                    new_name = ui.input(label="Instance Name")
+                    new_name = ui.input(label="Instance Name", value="")
 
     with ui.row().bind_visibility_from(table, "selected", backward=lambda val: bool(val)):
         ui.button("Edit", on_click=lambda: open_instance_page(label.text))
