@@ -1,4 +1,19 @@
-# volttron-installer
+# Eclipse VOLTRON Platform Installer
+
+## Developer Quick Start
+
+1. Clone the repository
+2. Create a python 3.10+ virtual environment inside the volttron-installer directory
+3. Activate the environment
+4. Execute ```pip install -r requirements.txt``` from the volttron-installer directory
+5. Execute ```uvicorn volttron_installer.__main__:app --reload --port 8000
+6. Open browser to [https://localhost:8000](https://localhost:8000)
+
+If using visual studio code, a launch.json file has been created.  Instead of step 5 one can
+launch the application using the debugger for `launch uvicorn application`.
+
+
+<!-- # volttron-installer
 ### Installing Prerequisites
 1. Ensure that Python version 3.10[^1] is installed by running `python3.10 --version`
    - If Python 3.10 is not installed, add the deadsnakes PPA by running `sudo add-apt-repository ppa:deadsnakes/ppa`
@@ -23,4 +38,4 @@
    - Pick what services are needed for each instance and click 'Configure Instance'
    - Navigate to the bottom of the page to enter your password, then click 'Install All Instances'
    - Start and stop buttons are provided under 'Configure Instance' for each instance
-[^1]: Any version of Python greater than 3.8 will work
+[^1]: Any version of Python greater than 3.8 will work -->
