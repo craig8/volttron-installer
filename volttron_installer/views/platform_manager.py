@@ -7,11 +7,11 @@ import logging
 _log = logging.getLogger(__name__)
 
 
-def platforms_view(page: Page) -> View:
+def platform_manager_view(page: Page) -> View:
     from volttron_installer.views import InstallerViews as vi_views
 
-    return View(vi_views.platforms.route, [
-        AppBar(title=Text("Platforms"),
+    return View(vi_views.platform_manager.route, [
+        AppBar(title=Text("Platform Manager!"),
                automatically_imply_leading=False,
                bgcolor=colors.SURFACE_VARIANT),
         ElevatedButton("Configuration Manager",

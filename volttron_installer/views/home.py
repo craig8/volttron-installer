@@ -16,5 +16,5 @@ def home_view(page: Page) -> View:
                bgcolor=colors.SURFACE_VARIANT),
         ElevatedButton("Configuration Manager", on_click=lambda _: page.go(vi_views.config_manager.route)),
         ElevatedButton("Platform List",
-                       on_click=lambda _: page.go(vi_views.platforms.route)),
+                       on_click=lambda _: page.go(vi_views.platform_manager.route)),
     ])
