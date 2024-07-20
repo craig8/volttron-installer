@@ -18,3 +18,8 @@ def home_view(page: Page) -> View:
         ElevatedButton("Platform List",
                        on_click=lambda _: page.go(vi_views.platform_manager.route)),
     ])
+# add containers for the amount of platforms that have been added, could be added in
+# a form of objects or what not
+
+# if home page is going to be the overview page, maybe have each of these objects route to
+# their own `platform_manager.py`?
