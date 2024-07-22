@@ -10,7 +10,7 @@ _log = logging.getLogger(__name__)
 
 def home_view(page: Page) -> View:
     from volttron_installer.views import InstallerViews as vi_views
-    from volttron_installer.components.program_card import baka_column
+    from volttron_installer.components.program_card import broooo_column
     
     return ft.View(
         "/",
@@ -48,7 +48,7 @@ def home_view(page: Page) -> View:
                                 #bgcolor="#000000",
                                 padding=ft.padding.only(left=50, right=0, top=50),
                                 expand=True,
-                                content=baka_column,
+                                content=broooo_column,
                             ),
                         ],
                         expand=True

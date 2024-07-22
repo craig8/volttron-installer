@@ -6,7 +6,7 @@ These objects should have the following properties:
 """ 
 from flet import *
 
-class ProgramTile(UserControl):
+class ProgramTile(UserControl): # full of monolithic code to see layout
     def __init__(self, page: Page):
         super().__init__()
         self.page = page
@@ -34,6 +34,6 @@ class ProgramTile(UserControl):
             )
         )
     
-baka_column = Row(
+broooo_column = Row(
     wrap=True
 )

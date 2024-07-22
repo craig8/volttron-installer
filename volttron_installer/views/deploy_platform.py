@@ -10,10 +10,10 @@ _log = logging.getLogger(__name__)
 
 def deploy_platform_view(page: Page) -> View:
     from volttron_installer.views import InstallerViews as vi_views
-    from volttron_installer.components.program_card import ProgramTile, baka_column
+    from volttron_installer.components.program_card import ProgramTile, broooo_column
     
     def funny_func(e):
-        baka_column.controls.append(ProgramTile(page).build_card())
+        broooo_column.controls.append(ProgramTile(page).build_card())
         print("please add a container")
         page.update()
     
