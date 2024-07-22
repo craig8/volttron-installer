@@ -10,42 +10,55 @@ _log = logging.getLogger(__name__)
 
 def home_view(page: Page) -> View:
     from volttron_installer.views import InstallerViews as vi_views
-
-    return View("/", [
-        Column(
-            controls=[
-                Container( # header
-                    bgcolor="blue",
-                    padding=padding.only(left=20, right=20),
-                    content=Row(
+    from volttron_installer.components.program_card import baka_column
+    
+    return ft.View(
+        "/",
+        controls=[
+            ft.Stack(
+                controls=[
+                    ft.Container(
+                        expand=True,
+                        gradient=ft.RadialGradient(
+                            colors=[ft.colors.PURPLE, ft.colors.BLACK],
+                            radius=1.4,
+                            center=ft.Alignment(0.8, 0.8)
+                        )
+                    ),
+                    ft.Column(
                         controls=[
-                            Text("Overview", size=30),
-                            IconButton(icon=icons.ADD,
-                                       tooltip="Add platform",
-                                       on_click=lambda _: page.go(vi_views.deploy_platform.route)),
-                            ElevatedButton("Platform List", on_click=lambda _: page.go(vi_views.platform_manager.route)),
+                            ft.Container(  # header
+                                #bgcolor="blue",
+                                padding=ft.padding.only(left=20, right=20),
+                                content=ft.Row(
+                                    controls=[
+                                        ft.Text("Overview", size=60, color="white"),
+                                        ft.IconButton(
+                                            icon=ft.icons.ADD,
+                                            tooltip="Add platform",
+                                            icon_color="white",
+                                            icon_size=40,
+                                            on_click=lambda _: page.go(vi_views.deploy_platform.route)
+                                        ),
+                                    ],
+                                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                                ),
+                            ),
+                            ft.Container(  # main view of all the program tiles
+                                #bgcolor="#000000",
+                                padding=ft.padding.only(left=50, right=0, top=50),
+                                expand=True,
+                                content=baka_column,
+                            ),
                         ],
-                        alignment=MainAxisAlignment.SPACE_BETWEEN,
-                    )
-                ),
-                Container( # main view of all the program tiles
-                    bgcolor="orange",
-                    padding=padding.only(left=50, right=50),
-                    #expand=True,
-                    #content= platform_container_column 
-                )
-            ]
-        ),
-        # AppBar(title=Text("Choose Application"),
-        #        automatically_imply_leading=False,
-        #        #bgcolor=colors.SURFACE_VARIANT),
-        # ElevatedButton("Configuration Manager", on_click=lambda _: page.go(vi_views.config_manager.route)),
-        # ElevatedButton("Platform List",
-        #                on_click=lambda _: page.go(vi_views.platform_manager.route)),
-    ],
-    padding=0
+                        expand=True
+                    ),
+                ],
+                expand=True
+            ),
+        ],
+        padding=0
     )
-
 # add containers for the amount of platforms that have been added, could be added in
 # a form of objects or what not
 

@@ -7,30 +7,33 @@ These objects should have the following properties:
 from flet import *
 
 class ProgramTile(UserControl):
-
     def __init__(self, page: Page):
-        self.card_container = Row()# export to home page and by each added platform, the row continously gets appends
+        super().__init__()
         self.page = page
-        self.activity = True
+        self.activity = "OFF"
         self.colors = {
-            "bgcolor" : "#9d9d9d" if self.activity == True else colors.with_opacity(0.65, self.colors["bgcolor"]),
-            "text_color" : "white" if self.activity == True else colors.with_opacity
+            "bgcolor": "#9d9d9d" if self.activity =="ON" else colors.with_opacity(0.65, "#9d9d9d"),
+            "text_color": "white" if self.activity == "ON" else colors.with_opacity(0.65, "white"),
+            "on_off": "#00ff00" if self.activity == "ON" else colors.with_opacity(0.65, "#ff0000")
         }
-
-        #monolithic code to generate a tile 
-
-    def card_container(self)-> Row:
-        tile_row = Row()
-
-    def add_card(self, e):
-        self.card_container.controls.append()
-        self.update()
-    
-    def build_card(self)-> Container:
+        
+    def build_card(self) -> Container:
         return Container(
             width=150,
             height=150,
             border_radius=25,
-            padding=padding.only(left=20, right=20, top=10, bottom=10),
-
+            padding=padding.all(10),
+            bgcolor=self.colors["bgcolor"],
+            on_click=lambda e: print("clicked"), # will lead to individualized page for managing program 
+            content=Column(
+                controls=[
+                    Row(controls=[Text("P1 -", color=self.colors['text_color']), Text(value=f"{self.activity}", color=self.colors['on_off'])]),
+                    Row(controls=[Text("Agents"), Text("0")]),
+                    Row(controls=[Text("Health"), Text("0")]),
+                ]
+            )
         )
+    
+baka_column = Row(
+    wrap=True
+)
