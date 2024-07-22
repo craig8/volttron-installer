@@ -10,7 +10,7 @@ class ProgramTile(UserControl): # full of monolithic code to see layout
     def __init__(self, page: Page):
         super().__init__()
         self.page = page
-        self.activity = "OFF"
+        self.activity = "OFF" # manually switched `ON`/`OFF` to see the visual
         self.colors = {
             "bgcolor": "#9d9d9d" if self.activity =="ON" else colors.with_opacity(0.65, "#9d9d9d"),
             "text_color": "white" if self.activity == "ON" else colors.with_opacity(0.65, "white"),
@@ -24,7 +24,7 @@ class ProgramTile(UserControl): # full of monolithic code to see layout
             border_radius=25,
             padding=padding.all(10),
             bgcolor=self.colors["bgcolor"],
-            on_click=lambda e: print("clicked"), # will lead to individualized page for managing program 
+            on_click=lambda e: print("clicked"), # will lead to individualized page for managing program, testing for now
             content=Column(
                 controls=[
                     Row(controls=[Text("P1 -", color=self.colors['text_color']), Text(value=f"{self.activity}", color=self.colors['on_off'])]),
