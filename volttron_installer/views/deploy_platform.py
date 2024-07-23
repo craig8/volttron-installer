@@ -19,9 +19,7 @@ class Agent:
             "agent" : "green",
         }
         self.agent_tile = Container(
-            width=175,
             height=100,
-            border=border.all(4, self.activity_colors),
             content=Row(
                 Container( # houses the button which pressed upon, will delete the agent
                     content=IconButton(
@@ -30,7 +28,10 @@ class Agent:
                     )
                 ),
                 Container( # houses the name of the agent being added
-
+                    height=100,
+                    width=175,
+                    border=border.all(4, self.activity_colors['agent']),
+                    content=Text(value=self.agent_name, color=self.activity_colors['agent'])
                 )
             )
         )
