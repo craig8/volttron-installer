@@ -10,8 +10,9 @@ import logging
 _log = logging.getLogger(__name__)
 
 class Agent:
-    def __init__(self):
+    def __init__(self, agent_name):
         super().__init__()
+        self.agent_name = agent_name
         self.selected_column = Column()
         self.activity_colors = {
             "hovered_agent" : "red",
@@ -21,14 +22,26 @@ class Agent:
             width=175,
             height=100,
             border=border.all(4, self.activity_colors),
-            content=Container()
+            content=Row(
+                Container( # houses the button which pressed upon, will delete the agent
+                    content=IconButton(
+                        icon=icons.DELETE_OUTLINE,
+                        on_click=self.skibidi_sigma
+                    )
+                ),
+                Container( # houses the name of the agent being added
+
+                )
+            )
         )
         pass
     
     def on_container_hover(e):
         #e.control.border = self.activity_colors['hovered_agent'] if e.data == "true" else self.activity_colors['agent']
         pass
-
+    
+    def skibidi_sigma(self, e):
+        print("i am soooo skibidi")
 
 
 def deploy_platform_view(page: Page) -> View:
@@ -134,7 +147,7 @@ def deploy_platform_view(page: Page) -> View:
         ]
     )
 
-    
+
     return View(vi_views.deploy_platform.route, 
         [
             Stack(
