@@ -25,6 +25,7 @@ os.environ["FLET_SECRET_KEY"] = settings.secret_key
 
 async def main(page: Page):
     from volttron_installer.views import InstallerViews as vi_views
+    page.theme_mode="dark"
 
     try:
         page.horizontal_alignment = ft.CrossAxisAlignment.CENTER

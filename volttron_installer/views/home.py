@@ -46,7 +46,7 @@ def home_view(page: Page) -> View:
                             ),
                             ft.Container(  # main view of all the program tiles
                                 #bgcolor="#000000",
-                                padding=ft.padding.only(left=50, right=0, top=50),
+                                padding=ft.padding.only(left=15, right=0, top=50),
                                 expand=True,
                                 content=broooo_column,
                             ),
