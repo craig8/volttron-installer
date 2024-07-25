@@ -6,6 +6,8 @@ These objects should have the following properties:
 """ 
 from flet import *
 from volttron_installer.modules.dynamic_routes import dynamic_routes
+from volttron_installer.components.background import gradial_background
+from volttron_installer.components.Header import Header
 
 class ProgramTile(UserControl): # full of monolithic code to see layout
     def __init__(self, page: Page, container, generated_url: str, title: str) -> None:
@@ -35,25 +37,34 @@ class ProgramTile(UserControl): # full of monolithic code to see layout
                 ]
             )
         )
-
         #add route to dynamic routes dynamically in a dynamic dynamically manner which is also dynamic
         view = self.program_view()
         dynamic_routes[self.generated_url] = view
-        print(dynamic_routes)
-        
+
     def build_card(self) -> Container:
         return self.program_tile
     
     def program_view(self) -> View:
-        return View (
+        # Crude monolithinc way of doing it but its okay for now,
+        # Initlializing the header and background
+        header = Header(self.title, self.page, "/").return_header()
+        background_gradient = gradial_background()
+        return View(
             self.generated_url,
             controls=[
                 Stack(
                     controls=[
-                        Container(
-                            content=Text(f"i am in {self.title}")
+                        background_gradient,
+                        Column(
+                            controls=[
+                                header,
+                                Container(
+                                    content=Text(f"i am in {self.title}")
+                                ),
+                            ]
                         ),
-                    ]
+                    ],
+                    expand=True
                 )
             ]
         )

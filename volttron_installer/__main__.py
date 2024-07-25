@@ -45,8 +45,6 @@ async def main(page: Page):
             
             # If not found, check dynamic routes
             if not found:
-                # view_func = dynamic_routes[e.route]
-                # if view_func:
                 page.views.append(dynamic_routes[e.route])
                 found = True
 
