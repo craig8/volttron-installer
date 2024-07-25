@@ -25,6 +25,7 @@ os.environ["FLET_SECRET_KEY"] = settings.secret_key
 
 async def main(page: Page):
     from volttron_installer.views import InstallerViews as vi_views
+    from volttron_installer.modules.dynamic_routes import dynamic_routes
     page.theme_mode="dark"
 
     try:
@@ -34,13 +35,24 @@ async def main(page: Page):
         def route_change(e: RouteChangeEvent):
             page.views.clear()
 
+            # First check static routes
+            found = False
             for p in vi_views:
                 if p.route == e.route:
                     page.views.append(p.instance(page=page))
+                    found = True
                     break
-            if not page.views:
-                raise ValueError(f"The route {e.route} was not defined.")
+            
+            # If not found, check dynamic routes
+            if not found:
+                # view_func = dynamic_routes[e.route]
+                # if view_func:
+                page.views.append(dynamic_routes[e.route])
+                found = True
 
+            if not found:
+                raise ValueError(f"The route {e.route} was not defined.")
+            
             page.update()
 
         def view_pop(view):
