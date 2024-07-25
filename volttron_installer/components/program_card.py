@@ -8,6 +8,7 @@ from flet import *
 from volttron_installer.modules.dynamic_routes import dynamic_routes
 from volttron_installer.components.background import gradial_background
 from volttron_installer.components.Header import Header
+from volttron_installer.platform_tabs.platform_config import PlatformConfig
 
 class ProgramTile(UserControl): # full of monolithic code to see layout
     def __init__(self, page: Page, container, generated_url: str, title: str) -> None:
@@ -37,6 +38,16 @@ class ProgramTile(UserControl): # full of monolithic code to see layout
                 ]
             )
         )
+
+        # PLATFORM CONFIG SECITON
+        self.name_field = TextField(hint_text="Only letters, numbers, and underscores are allowed.",)
+        self.all_addresses_checkbox = Checkbox(label="All Adresses")
+        self.address_field = Container(content=self.all_addresses_checkbox)
+        self.ports_field = TextField()
+        self.submit_button = OutlinedButton("Submit", disabled=True)
+        #self, name_field, all_adresses_checkbox, ports_field, submit_button, page: Page, platform_title: str)
+        self.platform_config_tab = PlatformConfig(self.name_field, self.address_field, self.ports_field, self.submit_button, self.page, self.title).platform_config_view()
+
         #add route to dynamic routes dynamically in a dynamic dynamically manner which is also dynamic
         view = self.program_view()
         dynamic_routes[self.generated_url] = view

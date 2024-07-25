@@ -60,7 +60,7 @@ added_agents=[]
 def deploy_platform_view(page: Page) -> View:
     from volttron_installer.views import InstallerViews as vi_views
     from volttron_installer.components.background import gradial_background
-    from volttron_installer.other.all_agents import agents
+    from volttron_installer.modules.all_agents import agents
     
     # monolithic code; pressing button appends tile to main page
 
@@ -201,6 +201,7 @@ def deploy_platform_view(page: Page) -> View:
                                     alignment=MainAxisAlignment.SPACE_BETWEEN
                                 )
                             ),
+                            #put into column
                             Container( # main transparent container to hold everything else
                                 margin=margin.only(left=20,right=20, bottom=20),
                                 bgcolor="#20f4f4f4",
