@@ -58,9 +58,34 @@ class ProgramTile(UserControl): # full of monolithic code to see layout
                         Column(
                             controls=[
                                 header,
-                                Container(
-                                    content=Text(f"i am in {self.title}")
-                                ),
+                                Tabs(
+                                    selected_index=0,
+                                    animation_duration=300,
+                                    tabs=[
+                                        Tab(
+                                            text="Tab 1",
+                                            content=Column(
+                                                scroll=ScrollMode.ALWAYS,
+                                                expand=True,
+                                                controls=[
+                                                    Container(
+                                                        content=Text("This is Tab 1"), alignment=alignment.center
+                                                    ),
+                                                ]
+                                            ),
+                                        ),
+                                        Tab(
+                                            tab_content=Icon(icons.SEARCH),
+                                            content=Text("This is Tab 2"),
+                                        ),
+                                        Tab(
+                                            text="Tab 3",
+                                            icon=icons.SETTINGS,
+                                            content=Text("This is Tab 3"),
+                                        ),
+                                    ],
+                                    expand=1,
+                                )
                             ]
                         ),
                     ],

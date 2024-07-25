@@ -10,6 +10,7 @@ class Header:
         self.header = Container(  # header
             padding=padding.only(left=20, right=20),
             content=Row(
+                wrap=True,
                 controls=[
                     IconButton(
                         icon=icons.ARROW_BACK_IOS_NEW,
