@@ -63,7 +63,7 @@ class ProgramTile(UserControl): # full of monolithic code to see layout
                                     animation_duration=300,
                                     tabs=[
                                         Tab(
-                                            text="Tab 1",
+                                            text="Platform Config",
                                             content=Column(
                                                 scroll=ScrollMode.ALWAYS,
                                                 expand=True,
