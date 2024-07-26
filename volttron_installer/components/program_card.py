@@ -56,8 +56,8 @@ class ProgramTile(UserControl): # full of monolithic code to see layout
         return self.program_tile
     
     def program_view(self) -> View:
-        # Crude monolithinc way of doing it but its okay for now,
-        # Initlializing the header and background
+        # Crude monolithic way of doing it but it's okay for now,
+        # Initializing the header and background
         header = Header(self.title, self.page, "/").return_header()
         background_gradient = gradial_background()
         return View(
@@ -75,7 +75,7 @@ class ProgramTile(UserControl): # full of monolithic code to see layout
                                     tabs=[
                                         Tab(
                                             text="Platform Config",
-                                            content= self.platform_config_tab
+                                            content=self.platform_config_tab
                                         ),
                                         Tab(
                                             tab_content=Icon(icons.SEARCH),
@@ -94,7 +94,8 @@ class ProgramTile(UserControl): # full of monolithic code to see layout
                     ],
                     expand=True
                 )
-            ]
+            ],
+            padding=0
         )
 
 program_tile_container = Row(
