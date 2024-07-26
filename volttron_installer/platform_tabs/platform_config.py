@@ -195,8 +195,7 @@ class PlatformConfig:
             self.agent_column.controls.append(agent_tile_to_add)
             self.added_agents.append(self.agent_dropdown.value)
             self.agent_column.update()
-            print("These are the amount of added agents: ", self.added_agents)
-
+            
     def platform_config_view(self) -> Container:
         return self.comprehensive_view
 

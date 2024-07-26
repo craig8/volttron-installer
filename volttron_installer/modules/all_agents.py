@@ -28,5 +28,3 @@ def agents() -> list: return [
     "VolttronCentralPlatform",
     "WeatherDotGov"
 ]
-
-added_agents=[]
