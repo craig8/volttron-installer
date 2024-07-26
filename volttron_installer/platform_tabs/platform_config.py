@@ -57,7 +57,7 @@ class PlatformConfig:
                 )
             ]
         )
-        self.agent_column = Column()
+        self.agent_column = Column(wrap=True)
 
         # Initialize platform configurations
         self.name_field = name_field
@@ -94,6 +94,7 @@ class PlatformConfig:
                 controls=[
                     *self.all_fields_formatted,
                     Container(
+                        #bgcolor="red",
                         height=70,
                         padding=padding.only(top=10, bottom=10, left=5, right=5),
                         content=Row(
@@ -112,15 +113,20 @@ class PlatformConfig:
                     ),
                     # Adding the last row ensures it is within the column structure
                     Container(
-                        #bgcolor="#20f4f4f4",
+                        #bgcolor="blue",
+                        expand=True,
                         content=Row(
+                            spacing=0,
                             controls=[
-                                Text("Where am ai"),
                                 Container(
+                                    expand=3,
+                                    #bgcolor="pink",
                                     padding=padding.only(left=4),
                                     content=self.agent_column
                                 ),
                                 Container(
+                                    #bgcolor="orange",
+                                    expand=2,
                                     content=Stack(
                                         controls=[
                                             Container(
