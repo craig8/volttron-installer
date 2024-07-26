@@ -75,15 +75,7 @@ class ProgramTile(UserControl): # full of monolithic code to see layout
                                     tabs=[
                                         Tab(
                                             text="Platform Config",
-                                            content=Column(
-                                                scroll=ScrollMode.ALWAYS,
-                                                expand=True,
-                                                controls=[
-                                                    Container(
-                                                        content=Text("This is Tab 1"), alignment=alignment.center
-                                                    ),
-                                                ]
-                                            ),
+                                            content= self.platform_config_tab
                                         ),
                                         Tab(
                                             tab_content=Icon(icons.SEARCH),

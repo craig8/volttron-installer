@@ -1,5 +1,4 @@
 from flet import *
-from volttron_installer.components.program_card import ProgramTile
 
 class Agent:
     def __init__(self, agent_name, parent_container, agent_list):
@@ -51,7 +50,7 @@ class PlatformConfig:
         self.platform_title = platform_title
 
         #establish properties for agents
-        self.agent_dropdown = self.numerate_agent_dropdown
+        self.agent_dropdown = self.numerate_agent_dropdown()
         self.agent_dropdown_with_button = Row(
             controls=[
                 Container(
@@ -95,7 +94,7 @@ class PlatformConfig:
         self.comprehensive_view = Column(
             spacing=0,
             controls=[
-                self.all_fields_formatted,
+                *self.all_fields_formatted,
                 Container(
                     height=70,
                     padding=padding.only(top=10,bottom=10, left=5,right=5),
@@ -143,11 +142,11 @@ class PlatformConfig:
                                             )
                                         )
                                     ]
-                                ),
+                                )
                             )
                         ]
                     )
-                ),
+                )
             ]
         )
         
@@ -195,7 +194,7 @@ class PlatformConfig:
     def numerate_agent_dropdown(self)-> Dropdown:
         from volttron_installer.modules.all_agents import agents
         dropdown_options = []
-        agent_list = agents
+        agent_list = agents()
         for agent in agent_list:
             dropdown_options.append(dropdown.Option(text=agent))
         return Dropdown(
