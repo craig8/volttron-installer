@@ -39,9 +39,10 @@ class Agent:
 
 
 class PlatformConfig:
-    def __init__(self, name_field, all_addresses_checkbox, ports_field, submit_button, page: Page, platform_title: str):
+    def __init__(self, name_field, all_addresses_checkbox, ports_field, submit_button, page: Page, platform_title: str, added_agents: list):
         self.page = page
         self.platform_title = platform_title
+        self.added_agents = added_agents
 
         # Initialize properties for agents
         self.agent_dropdown = self.numerate_agent_dropdown()
@@ -57,7 +58,7 @@ class PlatformConfig:
                 )
             ]
         )
-        self.agent_column = Column(wrap=True)
+        self.agent_column = Column(wrap=True, scroll=ScrollMode.AUTO)
 
         # Initialize platform configurations
         self.name_field = name_field
@@ -189,16 +190,13 @@ class PlatformConfig:
         return Dropdown(options=dropdown_options)
 
     def add_agent(self, e) -> None:
-        if self.agent_dropdown.value and self.agent_dropdown.value not in added_agents:
-            agent_tile_to_add = Agent(self.agent_dropdown.value, self.agent_column, added_agents).build_agent_card()
+        if self.agent_dropdown.value and self.agent_dropdown.value not in self.added_agents:
+            agent_tile_to_add = Agent(self.agent_dropdown.value, self.agent_column, self.added_agents).build_agent_card()
             self.agent_column.controls.append(agent_tile_to_add)
-            added_agents.append(self.agent_dropdown.value)
+            self.added_agents.append(self.agent_dropdown.value)
             self.agent_column.update()
-            print(self.agent_column.controls)
+            print("These are the amount of added agents: ", self.added_agents)
 
     def platform_config_view(self) -> Container:
         return self.comprehensive_view
 
-
-# Global scope
-added_agents = []

@@ -14,6 +14,7 @@ class ProgramTile(UserControl): # full of monolithic code to see layout
     def __init__(self, page: Page, container, generated_url: str, title: str) -> None:
         super().__init__()
         self.title = title
+        self.added_agents = []
         self.generated_url = f"/{generated_url}"
         self.home_container = container
         self.page = page
@@ -46,7 +47,7 @@ class ProgramTile(UserControl): # full of monolithic code to see layout
         self.ports_field = TextField()
         self.submit_button = OutlinedButton("Submit", disabled=True)
         #self, name_field, all_adresses_checkbox, ports_field, submit_button, page: Page, platform_title: str)
-        self.platform_config_tab = PlatformConfig(self.name_field, self.address_field, self.ports_field, self.submit_button, self.page, self.title).platform_config_view()
+        self.platform_config_tab = PlatformConfig(self.name_field, self.address_field, self.ports_field, self.submit_button, self.page, self.title, self.added_agents).platform_config_view()
 
         #add route to dynamic routes dynamically in a dynamic dynamically manner which is also dynamic
         view = self.program_view()

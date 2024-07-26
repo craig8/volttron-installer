@@ -16,10 +16,10 @@ class Header:
                         icon=icons.ARROW_BACK_IOS_NEW,
                         tooltip="Add platform",
                         icon_color="white",
-                        icon_size=40,
+                        icon_size=25,
                         on_click=lambda e: self.page.go(self.route_back_to)
                     ),
-                    Text(self.title, size=60, color="white"),
+                    Text(self.title, size=40, color="white"),
                 ],
                 alignment=MainAxisAlignment.SPACE_BETWEEN,
             ),
