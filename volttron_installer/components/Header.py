@@ -1,31 +1,29 @@
-# One problem wit hthis configuration is that if the title is too long, its bad; same with the home view header
-
 from flet import *
+from volttron_installer.modules.validate_field import validate_text
 
 class Header:
-    def __init__(self, title: str, page:Page, route: str):
+    def __init__(self, title: str, page: Page, route: str):
         self.title: str = title
         self.page: Page = page
         self.route_back_to: str = route
         self.edit_mode: bool = False
 
-        # logic for the title editing functionality
-        self.title_container = Container(visible= not self.edit_mode, content=Text(value=f"{self.title}"))
-        self.title_editing_field = TextField(value=f"{self.title}", visible=self.edit_mode)
-        self.title_edit_container = Row(controls=[self.title_container, self.title_editing_field])
+        # establish editing logic for to flip flop between the two icons
+        self.editing_icon = icons.EDIT
 
-        # establish editing logic for to flip flop between the two icons 
-        self.editing_icons = {
-            "icon" : icons.EDIT if self.edit_mode == False else icons.SAVE,
-            "color" : "white"
-        }
-        self.delete_program_button = IconButton(icon=icons.DELETE, on_click=self.delete_thang())
-        self.edit_program_title_button = IconButton(icon=self.editing_icons['icon'], on_click=self.handle_editing_mode())
+        self.delete_program_button = IconButton(icon=icons.DELETE, on_click=self.delete_thang)
+        self.edit_program_title_button = IconButton(icon=self.editing_icon, on_click=self.handle_editing_mode)
         self.edit_delete_grouped = Container(content=Row(controls=[self.edit_program_title_button, self.delete_program_button]))
 
+        # logic for the title editing functionality
+        self.title_container = Container(visible=not self.edit_mode, content=Text(value=f"{self.title}", size=24))
+        self.title_editing_field = TextField(value=self.title, visible=self.edit_mode, on_change=lambda e: validate_text(self.title_editing_field, self.edit_program_title_button))
+        self.title_edit_container = Row(controls=[self.title_container, self.title_editing_field])
+
         self.header = Container(  # header
-            padding=padding.only(left=20, right=20),
+            padding=padding.only(left=20, right=20, top=20),
             content=Row(
+                spacing=10,
                 wrap=True,
                 controls=[
                     Row(
@@ -54,21 +52,27 @@ class Header:
             ),
         )
 
-    def delete_thang(self) -> None:
+    def delete_thang(self, e) -> None:
         print("You have deleted me how dare you!")
 
-    def handle_editing_mode(self) -> None:
-        # if we are in edit mode, that means the save button is active so when we click, we are saving the title
+    def handle_editing_mode(self, e) -> None:
+        # if we are in edit mode, that means the save button is active, so when we click, we are saving the title
         if self.edit_mode:
             self.title = self.title_editing_field.value
-            self.title_container.value = self.title
+            self.title_container.content.value = self.title  # update the text value
+            print("The new title should be: ", self.title)
 
         # flip the edit mode to true or false for the next time the edit button is clicked
         self.edit_mode = not self.edit_mode
         self.title_container.visible = not self.edit_mode
         self.title_editing_field.visible = self.edit_mode
-        self.edit_program_title_button.icon = self.editing_icons
+
+        # update the editing icon
+        self.edit_program_title_button.icon = icons.SAVE if self.edit_mode else icons.EDIT
+        print("Edit mode is: ", self.edit_mode)
         self.page.update()
 
     def return_header(self) -> Container:
-        return self.header 
+        return self.header
+
+# Make sure to test the appropriately updated version of ProgramTile and other parts relying on Header.

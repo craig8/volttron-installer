@@ -1,4 +1,5 @@
 from flet import *
+from volttron_installer.modules.validate_field import validate_text
 
 class Agent:
     def __init__(self, agent_name, parent_container, agent_list):
@@ -61,9 +62,11 @@ class PlatformConfig:
         self.agent_column = Column(wrap=True, scroll=ScrollMode.AUTO)
 
         # Initialize platform configurations
+        self.submit_button = submit_button
+
         self.name_field = name_field
         self.name_field.value = platform_title
-        self.name_field.on_change = self.validate_text
+        self.name_field.on_change = lambda e: validate_text(self.name_field, self.submit_button)
         self.name_field_pair = self.field_pair("Name", self.name_field)
 
         self.all_addresses_checkbox = all_addresses_checkbox
@@ -83,7 +86,6 @@ class PlatformConfig:
 
         self.all_fields_formatted=self.divide_fields(self.almost_fields) 
 
-        self.submit_button = submit_button
 
         self.comprehensive_view = Container( # parent container for the cool transparent background hehee
             margin=margin.only(left=20, right=20, bottom=20, top=20),
@@ -147,17 +149,17 @@ class PlatformConfig:
             )
         )
 
-    def validate_text(self, e) -> None:
-        valid_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
-        input_text = e.control.value
-        if all(c in valid_chars for c in input_text) and 0 <= len(input_text) <= 9:
-            e.control.error_text = None
-            self.submit_button.disabled = False
-        else:
-            e.control.error_text = "Only letters, numbers, and underscores are allowed."
-            self.submit_button.disabled = True
-        self.submit_button.update()
-        e.control.update()
+    # def validate_text(self, e) -> None:
+    #     valid_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
+    #     input_text = e.control.value
+    #     if all(c in valid_chars for c in input_text) and 0 <= len(input_text) <= 9:
+    #         e.control.error_text = None
+    #         self.submit_button.disabled = False
+    #     else:
+    #         e.control.error_text = "Only letters, numbers, and underscores are allowed."
+    #         self.submit_button.disabled = True
+    #     self.submit_button.update()
+    #     e.control.update()
 
     def divide_fields(self, field_list) -> list:
         div = Divider(height=9, thickness=3, color="white")
