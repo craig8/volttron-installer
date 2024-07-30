@@ -13,7 +13,7 @@ from volttron_installer.platform_tabs.platform_config import PlatformConfig
 class ProgramTile(UserControl): # full of monolithic code to see layout
     def __init__(self, page: Page, container, generated_url: str, title: str) -> None:
         super().__init__()
-        self.title = title
+        self.title = title 
         self.added_agents = []
         self.generated_url = f"/{generated_url}"
         self.home_container = container

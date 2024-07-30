@@ -19,8 +19,10 @@ class Agent:
             content=self.label,
         )
 
+
+#too lazy to remove and debug the hover feature once removed so just make everything green lol
     def get_agent_color(self):
-        return "red" if self.active else "green"
+        return "green" if self.active else "green"
 
     def color_hover_change(self, e):
         self.active = (e.data == "true")
@@ -63,6 +65,7 @@ class PlatformConfig:
 
         # Initialize platform configurations
         self.submit_button = submit_button
+        self.submit_button.on_click = self.deploy_to_platform
 
         self.name_field = name_field
         self.name_field.value = platform_title
@@ -148,19 +151,7 @@ class PlatformConfig:
                 ]
             )
         )
-
-    # def validate_text(self, e) -> None:
-    #     valid_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
-    #     input_text = e.control.value
-    #     if all(c in valid_chars for c in input_text) and 0 <= len(input_text) <= 9:
-    #         e.control.error_text = None
-    #         self.submit_button.disabled = False
-    #     else:
-    #         e.control.error_text = "Only letters, numbers, and underscores are allowed."
-    #         self.submit_button.disabled = True
-    #     self.submit_button.update()
-    #     e.control.update()
-
+        
     def divide_fields(self, field_list) -> list:
         div = Divider(height=9, thickness=3, color="white")
         #puts a divider in between each field pair in the field list 
@@ -198,6 +189,13 @@ class PlatformConfig:
             self.added_agents.append(self.agent_dropdown.value)
             self.agent_column.update()
             
+    def deploy_to_platform(self, e) -> None:
+        from volttron_installer.components.deployment_modal import DeployToPlatformModal, ProgressBar
+        progressers = ProgressBar(self.page, "Initialization")
+        modal_thing = DeployToPlatformModal.return_modal()
+        print("hello world")
+        pass
+    
     def platform_config_view(self) -> Container:
         return self.comprehensive_view
 

@@ -17,7 +17,7 @@ class Header:
 
         # logic for the title editing functionality
         self.title_container = Container(visible=not self.edit_mode, content=Text(value=f"{self.title}", size=24))
-        self.title_editing_field = TextField(value=self.title, visible=self.edit_mode, on_change=lambda e: validate_text(self.title_editing_field, self.edit_program_title_button))
+        self.title_editing_field = TextField(value=self.title, visible=self.edit_mode, width=100, on_change=lambda e: validate_text(self.title_editing_field, self.edit_program_title_button))
         self.title_edit_container = Row(controls=[self.title_container, self.title_editing_field])
 
         self.header = Container(  # header
@@ -60,7 +60,6 @@ class Header:
         if self.edit_mode:
             self.title = self.title_editing_field.value
             self.title_container.content.value = self.title  # update the text value
-            print("The new title should be: ", self.title)
 
         # flip the edit mode to true or false for the next time the edit button is clicked
         self.edit_mode = not self.edit_mode
@@ -69,10 +68,7 @@ class Header:
 
         # update the editing icon
         self.edit_program_title_button.icon = icons.SAVE if self.edit_mode else icons.EDIT
-        print("Edit mode is: ", self.edit_mode)
         self.page.update()
 
     def return_header(self) -> Container:
         return self.header
-
-# Make sure to test the appropriately updated version of ProgramTile and other parts relying on Header.
