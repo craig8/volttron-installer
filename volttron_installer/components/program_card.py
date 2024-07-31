@@ -9,16 +9,18 @@ from volttron_installer.modules.dynamic_routes import dynamic_routes
 from volttron_installer.components.background import gradial_background
 from volttron_installer.components.Header import Header
 from volttron_installer.platform_tabs.platform_config import PlatformConfig
+from volttron_installer.components.program_components.program import Program
 
-class ProgramTile(UserControl): # full of monolithic code to see layout
+
+
+class ProgramTile(Program): # full of monolithic code to see layout
     def __init__(self, page: Page, container, generated_url: str, title: str) -> None:
-        super().__init__()
-        self.title = title 
-        self.added_agents = []
+        super().__init__(title, page, added_agents=[])
+        
+        print(self.activity) # make sure we got that thang
+
         self.generated_url = f"/{generated_url}"
         self.home_container = container
-        self.page = page
-        self.activity = "OFF" # manually switched `ON`/`OFF` to see the visual
         self.colors = {
             "bgcolor": "#9d9d9d" if self.activity =="ON" else colors.with_opacity(0.65, "#9d9d9d"),
             "text_color": "white" if self.activity == "ON" else colors.with_opacity(0.65, "white"),

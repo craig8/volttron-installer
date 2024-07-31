@@ -190,7 +190,7 @@ class PlatformConfig:
             self.agent_column.update()
             
     def deploy_to_platform(self, e) -> None:
-        from volttron_installer.components.deployment_modal import DeployToPlatformModal, ProgressBar
+        from volttron_installer.components.program_components.deployment_modal import DeployToPlatformModal, ProgressBar
         progressers = ProgressBar(self.page, "Initialization")
         modal_thing = DeployToPlatformModal.return_modal()
         print("hello world")
