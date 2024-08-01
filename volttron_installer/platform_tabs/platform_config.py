@@ -1,6 +1,6 @@
 from flet import *
 from volttron_installer.modules.validate_field import validate_text
-from volttron_installer.components.program_components.program import Program
+from volttron_installer.components.program_components.program import Program, SiblingCommunicator
 
 class Agent:
     def __init__(self, agent_name, parent_container, agent_list):
@@ -20,8 +20,6 @@ class Agent:
             content=self.label,
         )
 
-
-#too lazy to remove and debug the hover feature once removed so just make everything green lol
     def get_agent_color(self):
         return "green" if self.active else "green"
 
@@ -41,18 +39,10 @@ class Agent:
     def build_agent_card(self) -> Container:
         return self.agent_tile
 
-from flet import *
-from volttron_installer.modules.validate_field import validate_text
-from volttron_installer.components.program_components.program import Program, SiblingCommunicator
-
 class PlatformConfig(Program, SiblingCommunicator):
     def __init__(self, name_field, all_addresses_checkbox, ports_field, submit_button, page: Page, title: str, added_agents: list, activity: str = "OFF"):
-         # Pass the activity parameter to the parent class
-
-        #register itself as a sibling
-        #Program.register_sibling(self.generated_url, self)
-
-
+        super().__init__(title=title, page=page, generated_url="", added_agents=added_agents, activity=activity)  # Call to initialize the parent class
+        
         # No need to reassign these attributes as the parent class already did the work
         self.name_field = name_field
         self.name_field.value = title  # Set the value of the name field to the title
@@ -60,10 +50,8 @@ class PlatformConfig(Program, SiblingCommunicator):
         
         self.all_addresses_checkbox = all_addresses_checkbox
         self.address_field_pair = self.field_pair("Addresses", self.all_addresses_checkbox)
-
         self.ports_field = ports_field
         self.ports_field_pair = self.field_pair("Ports", self.ports_field)
-
         self.submit_button = submit_button
         self.submit_button.on_click = self.deploy_to_platform
 
@@ -75,7 +63,6 @@ class PlatformConfig(Program, SiblingCommunicator):
             ]
         )
         self.agent_column = Column(wrap=True, scroll=ScrollMode.AUTO)
-        
         self.bus_field_pair = self.field_pair("Bus Type", Text("2mg", size=18, color="white"))
 
         self.almost_fields = [
@@ -150,12 +137,8 @@ class PlatformConfig(Program, SiblingCommunicator):
             self.agent_column.update()
 
     def deploy_to_platform(self, e) -> None:
-        #from volttron_installer.components.program_components.deployment_modal import DeployToPlatformModal, ProgressBar
-        #progressers = ProgressBar(self.page, "Initialization")
-        #modal_thing = DeployToPlatformModal.return_modal()
         print("hello world")
         self.activity = "ON"
-        self.page.update()
         print(self.activity)
         self.event_bus.publish("process_data", "self.specific_method()")
 
