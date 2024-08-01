@@ -9,55 +9,112 @@ from volttron_installer.modules.dynamic_routes import dynamic_routes
 from volttron_installer.components.background import gradial_background
 from volttron_installer.components.Header import Header
 from volttron_installer.platform_tabs.platform_config import PlatformConfig
-from volttron_installer.components.program_components.program import Program
+from volttron_installer.components.program_components.program import Program, SiblingCommunicator
 
 
-
-class ProgramTile(Program): # full of monolithic code to see layout
+class ProgramTile(Program, SiblingCommunicator):
     def __init__(self, page: Page, container, generated_url: str, title: str) -> None:
-        super().__init__(title, page, added_agents=[])
+        super().__init__(title, page, generated_url)
         
-        print(self.activity) # make sure we got that thang
+        # override the parent function so sibling classes can call it aswell
+        # self.override_update_ui()
 
-        self.generated_url = f"/{generated_url}"
+        # Subscribe to events
+        self.event_bus.subscribe("process_data", self.process_data)
+
+        #registering as sibling 
+        #Program.register_sibling(self.generated_url, self)
+
+        print(self.activity) # make sure we got that thang
+        
         self.home_container = container
-        self.colors = {
-            "bgcolor": "#9d9d9d" if self.activity =="ON" else colors.with_opacity(0.65, "#9d9d9d"),
-            "text_color": "white" if self.activity == "ON" else colors.with_opacity(0.65, "white"),
-            "on_off": "#00ff00" if self.activity == "ON" else colors.with_opacity(0.65, "#ff0000")
-        }
-        self.program_tile = Container(
+        self.program_tile = self.build_tile()
+
+        # PLATFORM CONFIG SECTION
+        self.name_field = TextField(hint_text="Only letters, numbers, and underscores are allowed.")
+        self.all_addresses_checkbox = Checkbox(label="All Addresses")
+        self.address_field = Container(content=self.all_addresses_checkbox)
+        self.ports_field = TextField()
+        self.submit_button = OutlinedButton("Submit", disabled=True)
+
+        self.platform_config_tab = PlatformConfig(
+            self.name_field, 
+            self.address_field, 
+            self.ports_field, 
+            self.submit_button, 
+            self.page, 
+            self.title, 
+            self.added_agents
+        ).platform_config_view()
+
+
+        # Add route to dynamic routes dynamically
+        view = self.program_view()
+        dynamic_routes[self.generated_url] = view
+
+
+
+    def update_program_tile_ui(self):
+        print("ProgramTile.update_program_tile_ui called")
+        # Implement specific UI update logic for ProgramTile
+
+    def specific_method(self):
+        print("ProgramTile.specific_method called")
+        # Implement specific action logic for ProgramTile
+
+    def process_data(self, data):
+        print("ProgramTile received:", data)
+        eval(data)
+
+
+    def get_background_color(self):
+        return "#9d9d9d" if self.activity == "ON" else colors.with_opacity(0.65, "#9d9d9d")
+
+    def get_text_color(self):
+        return "white" if self.activity == "ON" else colors.with_opacity(0.65, "white")
+
+    def get_status_color(self):
+        return "#00ff00" if self.activity == "ON" else colors.with_opacity(0.65, "#ff0000")
+
+    def update_program_tile_ui(self):
+        # am i really bein gcalled?:
+        print("from update_ui: ", self.activity)
+
+        # Update UI components based on activity state
+        self.program_tile.bgcolor = self.program_tile.get_background_color()
+        self.program_tile.content.controls[0].controls[1].color = self.program_tile.get_status_color()
+        self.program_tile.content.controls[0].controls[1].value = self.program_tile.activity
+        for control in self.program_tile.content.controls:
+            for subcontrol in control.controls:
+                if isinstance(subcontrol, Text):
+                    subcontrol.color = self.program_tile.get_text_color()
+        self.program_tile.update()
+        self.page.update()
+
+    def build_tile(self):
+        return Container(
             width=150,
             height=150,
             border_radius=25,
             padding=padding.all(10),
-            bgcolor=self.colors["bgcolor"],
-            on_click=lambda e: self.page.go(self.generated_url), # will lead to individualized page for managing program, testing for now
+            bgcolor=self.get_background_color(),
+            on_click=lambda e: self.page.go(self.generated_url),  # will lead to individualized page for managing program, testing for now
             content=Column(
                 controls=[
-                    Row(controls=[Text(self.title, color=self.colors['text_color']), Text(value=f"{self.activity}", color=self.colors['on_off'])]),
+                    Row(controls=[Text(self.title, color=self.get_text_color()), Text(value=f"{self.activity}", color=self.get_status_color())]),
                     Row(controls=[Text("Agents"), Text("0")]),
                     Row(controls=[Text("Health"), Text("0")]),
                 ]
             )
         )
 
-        # PLATFORM CONFIG SECITON
-        self.name_field = TextField(hint_text="Only letters, numbers, and underscores are allowed.",)
-        self.all_addresses_checkbox = Checkbox(label="All Adresses")
-        self.address_field = Container(content=self.all_addresses_checkbox)
-        self.ports_field = TextField()
-        self.submit_button = OutlinedButton("Submit", disabled=True)
-        #self, name_field, all_adresses_checkbox, ports_field, submit_button, page: Page, platform_title: str)
-        self.platform_config_tab = PlatformConfig(self.name_field, self.address_field, self.ports_field, self.submit_button, self.page, self.title, self.added_agents).platform_config_view()
-
-        #add route to dynamic routes dynamically in a dynamic dynamically manner which is also dynamic
-        view = self.program_view()
-        dynamic_routes[self.generated_url] = view
-
     def build_card(self) -> Container:
         return self.program_tile
     
+    # @classmethod
+    # def override_update_ui(cls) -> None:
+    #     Program.update_program_tile_ui = cls.update_program_tile_ui
+
     def program_view(self) -> View:
         # Crude monolithic way of doing it but it's okay for now,
         # Initializing the header and background
@@ -101,6 +158,5 @@ class ProgramTile(Program): # full of monolithic code to see layout
             padding=0
         )
 
-program_tile_container = Row(
-    wrap=True
-)
+# Container to hold program tiles
+program_tile_container = Row(wrap=True)

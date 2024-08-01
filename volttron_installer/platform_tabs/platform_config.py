@@ -1,5 +1,6 @@
 from flet import *
 from volttron_installer.modules.validate_field import validate_text
+from volttron_installer.components.program_components.program import Program
 
 class Agent:
     def __init__(self, agent_name, parent_container, agent_list):
@@ -40,57 +41,52 @@ class Agent:
     def build_agent_card(self) -> Container:
         return self.agent_tile
 
+from flet import *
+from volttron_installer.modules.validate_field import validate_text
+from volttron_installer.components.program_components.program import Program, SiblingCommunicator
 
-class PlatformConfig:
-    def __init__(self, name_field, all_addresses_checkbox, ports_field, submit_button, page: Page, platform_title: str, added_agents: list):
-        self.page = page
-        self.platform_title = platform_title
-        self.added_agents = added_agents
+class PlatformConfig(Program, SiblingCommunicator):
+    def __init__(self, name_field, all_addresses_checkbox, ports_field, submit_button, page: Page, title: str, added_agents: list, activity: str = "OFF"):
+        Program().__init__(title, page, activity)  # Pass the activity parameter to the parent class
 
-        # Initialize properties for agents
-        self.agent_dropdown = self.numerate_agent_dropdown()
-        self.agent_dropdown_with_button = Row(
-            controls=[
-                Container(
-                    expand=3,
-                    content=self.agent_dropdown
-                ),
-                Container(
-                    width=40,
-                    content=IconButton(icon=icons.ADD_CIRCLE_OUTLINE_ROUNDED, on_click=self.add_agent, icon_color="white"),
-                )
-            ]
-        )
-        self.agent_column = Column(wrap=True, scroll=ScrollMode.AUTO)
+        #register itself as a sibling
+        #Program.register_sibling(self.generated_url, self)
 
-        # Initialize platform configurations
-        self.submit_button = submit_button
-        self.submit_button.on_click = self.deploy_to_platform
 
+        # No need to reassign these attributes as the parent class already did the work
         self.name_field = name_field
-        self.name_field.value = platform_title
+        self.name_field.value = title  # Set the value of the name field to the title
         self.name_field.on_change = lambda e: validate_text(self.name_field, self.submit_button)
-        self.name_field_pair = self.field_pair("Name", self.name_field)
-
+        
         self.all_addresses_checkbox = all_addresses_checkbox
         self.address_field_pair = self.field_pair("Addresses", self.all_addresses_checkbox)
 
         self.ports_field = ports_field
         self.ports_field_pair = self.field_pair("Ports", self.ports_field)
 
+        self.submit_button = submit_button
+        self.submit_button.on_click = self.deploy_to_platform
+
+        self.agent_dropdown = self.numerate_agent_dropdown()
+        self.agent_dropdown_with_button = Row(
+            controls=[
+                Container(expand=3, content=self.agent_dropdown),
+                Container(width=40, content=IconButton(icon=icons.ADD_CIRCLE_OUTLINE_ROUNDED, on_click=self.add_agent, icon_color="white"))
+            ]
+        )
+        self.agent_column = Column(wrap=True, scroll=ScrollMode.AUTO)
+        
         self.bus_field_pair = self.field_pair("Bus Type", Text("2mg", size=18, color="white"))
 
         self.almost_fields = [
-            self.name_field_pair,
+            self.field_pair("Name", self.name_field),
             self.address_field_pair,
             self.ports_field_pair,
             self.bus_field_pair
         ]
+        self.all_fields_formatted = self.divide_fields(self.almost_fields)
 
-        self.all_fields_formatted=self.divide_fields(self.almost_fields) 
-
-
-        self.comprehensive_view = Container( # parent container for the cool transparent background hehee
+        self.comprehensive_view = Container(
             margin=margin.only(left=20, right=20, bottom=20, top=20),
             bgcolor="#20f4f4f4",
             border_radius=12,
@@ -100,63 +96,33 @@ class PlatformConfig:
                 controls=[
                     *self.all_fields_formatted,
                     Container(
-                        #bgcolor="red",
                         height=70,
                         padding=padding.only(top=10, bottom=10, left=5, right=5),
                         content=Row(
                             expand=True,
                             controls=[
-                                Container(
-                                    expand=2,
-                                    content=Text("Agents", size=20)
-                                ),
-                                Container(
-                                    expand=3,
-                                    content=self.agent_dropdown_with_button,
-                                )
+                                Container(expand=2, content=Text("Agents", size=20)),
+                                Container(expand=3, content=self.agent_dropdown_with_button)
                             ]
                         )
                     ),
-                    # Adding the last row ensures it is within the column structure
                     Container(
-                        #bgcolor="blue",
                         expand=True,
                         content=Row(
                             spacing=0,
                             controls=[
-                                Container(
-                                    expand=3,
-                                    #bgcolor="pink",
-                                    padding=padding.only(left=4),
-                                    content=self.agent_column
-                                ),
-                                Container(
-                                    #bgcolor="orange",
-                                    expand=2,
-                                    content=Stack(
-                                        controls=[
-                                            Container(
-                                                bottom=10,
-                                                right=10,
-                                                height=50,
-                                                width=100,
-                                                content=self.submit_button
-                                            )
-                                        ]
-                                    )
-                                )
+                                Container(expand=3, padding=padding.only(left=4), content=self.agent_column),
+                                Container(expand=2, content=Stack(controls=[Container(bottom=10, right=10, height=50, width=100, content=self.submit_button)]))
                             ]
-                        ),
+                        )
                     )
                 ]
             )
         )
-        
+
     def divide_fields(self, field_list) -> list:
         div = Divider(height=9, thickness=3, color="white")
-        #puts a divider in between each field pair in the field list 
         return [element for pair in zip(field_list, [div] * (len(field_list) - 1)) for element in pair] + [field_list[-1], div]
-    
 
     def field_pair(self, text, input) -> Container:
         return Container(
@@ -164,14 +130,8 @@ class PlatformConfig:
             padding=padding.only(top=10, bottom=10, left=5, right=5),
             content=Row(
                 controls=[
-                    Container(
-                        expand=2,
-                        content=Text(f"{text}", size=20)
-                    ),
-                    Container(
-                        expand=3,
-                        content=input
-                    )
+                    Container(expand=2, content=Text(f"{text}", size=20)),
+                    Container(expand=3, content=input)
                 ],
                 spacing=0
             )
@@ -188,14 +148,16 @@ class PlatformConfig:
             self.agent_column.controls.append(agent_tile_to_add)
             self.added_agents.append(self.agent_dropdown.value)
             self.agent_column.update()
-            
+
     def deploy_to_platform(self, e) -> None:
-        from volttron_installer.components.program_components.deployment_modal import DeployToPlatformModal, ProgressBar
-        progressers = ProgressBar(self.page, "Initialization")
-        modal_thing = DeployToPlatformModal.return_modal()
+        #from volttron_installer.components.program_components.deployment_modal import DeployToPlatformModal, ProgressBar
+        #progressers = ProgressBar(self.page, "Initialization")
+        #modal_thing = DeployToPlatformModal.return_modal()
         print("hello world")
-        pass
-    
+        self.activity = "ON"
+        self.page.update()
+        print(self.activity)
+        self.event_bus.publish("process_data", "self.specific_method()")
+
     def platform_config_view(self) -> Container:
         return self.comprehensive_view
-

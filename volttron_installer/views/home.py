@@ -27,7 +27,7 @@ def generate_URL() -> str:
         if new_url not in platforms_added:
             platforms_added.append(new_url)
             print(platforms_added)
-            return new_url
+            return f"/{new_url}"
 
 def numerate_amount_of_platforms() -> int:
     platform_number = len(platforms_added)
