@@ -11,22 +11,15 @@ from volttron_installer.components.Header import Header
 from volttron_installer.platform_tabs.platform_config import PlatformConfig
 from volttron_installer.components.program_components.program import Program, SiblingCommunicator
 
-
 class ProgramTile(Program, SiblingCommunicator):
     def __init__(self, page: Page, container, generated_url: str, title: str) -> None:
         super().__init__(title, page, generated_url)
-        
-        # override the parent function so sibling classes can call it aswell
-        # self.override_update_ui()
 
         # Subscribe to events
         self.event_bus.subscribe("process_data", self.process_data)
 
-        #registering as sibling 
-        #Program.register_sibling(self.generated_url, self)
+        print(self.activity)  # Verify instantiation
 
-        print(self.activity) # make sure we got that thang
-        
         self.home_container = container
         self.program_tile = self.build_tile()
 

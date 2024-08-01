@@ -47,7 +47,7 @@ from volttron_installer.components.program_components.program import Program, Si
 
 class PlatformConfig(Program, SiblingCommunicator):
     def __init__(self, name_field, all_addresses_checkbox, ports_field, submit_button, page: Page, title: str, added_agents: list, activity: str = "OFF"):
-        Program().__init__(title, page, activity)  # Pass the activity parameter to the parent class
+         # Pass the activity parameter to the parent class
 
         #register itself as a sibling
         #Program.register_sibling(self.generated_url, self)

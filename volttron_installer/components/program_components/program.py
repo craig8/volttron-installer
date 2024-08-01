@@ -1,5 +1,5 @@
-# holds global variables for each individual program such as title, page and what not for
-# better clarity and modularbility
+# program.py
+
 from flet import Page
 
 class SiblingCommunicator:
@@ -16,20 +16,14 @@ class SiblingCommunicator:
             for subscriber in self._subscribers[event_type]:
                 subscriber(data)
 
-
 class Program:
-
-    def __init__(self, title: str, page: Page, generated_url: str, activity: str = "OFF") -> None:
+    def __init__(self, title: str, page: Page, generated_url: str, added_agents: list = None, activity: str = "OFF") -> None:
         self.title = title
-        self.sibling_communicator = SiblingCommunicator()
         self.page = page
-        self.added_agents: list = []
-        self.activity = "OFF"  # OFF by default
         self.generated_url = generated_url
-
-    def __init__(self, event_bus):
-        self.event_bus = event_bus
+        self.added_agents = added_agents if added_agents else []
+        self.activity = activity  # OFF by default
+        self.event_bus = SiblingCommunicator()  # Initialize the sibling communicator
 
     def send_signal(self, data):
         self.event_bus.publish("process_data", data)
-
