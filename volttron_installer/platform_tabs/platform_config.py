@@ -1,3 +1,5 @@
+# platform_config.py
+
 from flet import *
 from volttron_installer.modules.validate_field import validate_text
 from volttron_installer.components.program_components.program import Program, SiblingCommunicator
@@ -39,11 +41,10 @@ class Agent:
     def build_agent_card(self) -> Container:
         return self.agent_tile
 
-class PlatformConfig(Program, SiblingCommunicator):
-    def __init__(self, name_field, all_addresses_checkbox, ports_field, submit_button, page: Page, title: str, added_agents: list, activity: str = "OFF"):
-        super().__init__(title=title, page=page, generated_url="", added_agents=added_agents, activity=activity)  # Call to initialize the parent class
+class PlatformConfig(Program):
+    def __init__(self, page: Page, name_field, all_addresses_checkbox, ports_field, submit_button, event_bus: SiblingCommunicator, title: str, added_agents: list) -> None:
+        super().__init__(title=title, page=page, generated_url="", event_bus=event_bus, added_agents=added_agents) 
         
-        # No need to reassign these attributes as the parent class already did the work
         self.name_field = name_field
         self.name_field.value = title  # Set the value of the name field to the title
         self.name_field.on_change = lambda e: validate_text(self.name_field, self.submit_button)
@@ -137,10 +138,8 @@ class PlatformConfig(Program, SiblingCommunicator):
             self.agent_column.update()
 
     def deploy_to_platform(self, e) -> None:
-        print("hello world")
-        self.activity = "ON"
-        print(self.activity)
-        self.event_bus.publish("process_data", "self.specific_method()")
+        self.flip_activity()
+        self.event_bus.publish('process_data', "self.update_program_tile_ui()")
 
     def platform_config_view(self) -> Container:
         return self.comprehensive_view

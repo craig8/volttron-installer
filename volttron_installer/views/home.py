@@ -1,9 +1,13 @@
+# home.py
+
 import platform
 from flet import *
 
 from typing import Callable
 
 import logging
+
+from volttron_installer.components.program_components.program import create_sibling_communicator
 
 _log = logging.getLogger(__name__)
 
@@ -19,15 +23,12 @@ def generate_random_path(length=7) -> str:
     return ''.join(random.choice(characters) for _ in range(length))
 
 def generate_URL() -> str:
-    # While loop keeps generating a new URL until its unique
     while True:
-        # Generate unique URL math
         new_url = generate_random_path()
-        # If URL is not in platforms_added, add it and return the new URL
         if new_url not in platforms_added:
             platforms_added.append(new_url)
             print(platforms_added)
-            return f"/{new_url}"
+            return f"/{new_url}"    
 
 def numerate_amount_of_platforms() -> int:
     platform_number = len(platforms_added)
@@ -38,10 +39,12 @@ def home_view(page: Page) -> View:
     from volttron_installer.components.program_card import program_tile_container
     from volttron_installer.components.background import gradial_background
     from volttron_installer.components.program_card import ProgramTile
+    from volttron_installer.components.program_components.program import create_sibling_communicator
 
-    # on tile click, generate a new object and append it to the column containing the tiles
     def add_platform_tile(e) -> None:
-        program_tile_container.controls.append(ProgramTile(page, program_tile_container, generate_URL(), numerate_amount_of_platforms()).build_card())
+        event_bus = create_sibling_communicator()
+        program_tile = ProgramTile(page, program_tile_container, generate_URL(), numerate_amount_of_platforms(), event_bus)
+        program_tile_container.controls.append(program_tile.build_card())
         page.update()
 
     compybg = gradial_background()
@@ -72,7 +75,7 @@ def home_view(page: Page) -> View:
                             ),
                             Container(  # main view of all the program tiles
                                 padding=padding.only(left=15, right=0, top=50, bottom=15),
-                                content=Column( # column to enable scrolling if necessary
+                                content=Column(
                                     scroll=ScrollMode.AUTO,
                                     controls=[program_tile_container]
                                 )
@@ -86,8 +89,3 @@ def home_view(page: Page) -> View:
         ],
         padding=0
     )
-# add containers for the amount of platforms that have been added, could be added in
-# a form of objects or what not
-
-# if home page is going to be the overview page, maybe have each of these objects route to
-# their own `platform_manager.py`?
