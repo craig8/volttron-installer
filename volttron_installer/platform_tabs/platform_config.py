@@ -39,13 +39,14 @@ class Agent:
     def build_agent_card(self) -> Container:
         return self.agent_tile
 
-class PlatformConfig(Program, SiblingCommunicator):
-    def __init__(self, name_field, all_addresses_checkbox, ports_field, submit_button, page: Page, event_bus, title: str, added_agents: list, activity: str = "OFF"):
-        super().__init__(title=title, page=page, generated_url="", added_agents=added_agents, activity=activity, event_bus=event_bus)  # Call to initialize the parent class
+class PlatformConfig:
+    def __init__(self, name_field, all_addresses_checkbox, ports_field, submit_button, shared_instance):
         
-        # No need to reassign these attributes as the parent class already did the work
+        #INITIALIZE THE COMPY FELLAS
+        self.program = shared_instance
+
         self.name_field = name_field
-        self.name_field.value = title  # Set the value of the name field to the title
+        self.name_field.value = self.program.title  # Set the value of the name field to the title
         self.name_field.on_change = lambda e: validate_text(self.name_field, self.submit_button)
         
         self.all_addresses_checkbox = all_addresses_checkbox
@@ -130,15 +131,15 @@ class PlatformConfig(Program, SiblingCommunicator):
         return Dropdown(options=dropdown_options)
 
     def add_agent(self, e) -> None:
-        if self.agent_dropdown.value and self.agent_dropdown.value not in self.added_agents:
-            agent_tile_to_add = Agent(self.agent_dropdown.value, self.agent_column, self.added_agents).build_agent_card()
+        if self.agent_dropdown.value and self.agent_dropdown.value not in self.program.added_agents:
+            agent_tile_to_add = Agent(self.agent_dropdown.value, self.agent_column, self.program.added_agents).build_agent_card()
             self.agent_column.controls.append(agent_tile_to_add)
-            self.added_agents.append(self.agent_dropdown.value)
+            self.program.added_agents.append(self.agent_dropdown.value)
             self.agent_column.update()
 
     def deploy_to_platform(self, e) -> None:
-        self.flip_activity()
-        self.event_bus.publish('process_data', "self.update_program_tile_ui()")
+        self.program.flip_activity()
+        self.program.event_bus.publish('process_data', "self.update_program_tile_ui()")
 
     def platform_config_view(self) -> Container:
         return self.comprehensive_view

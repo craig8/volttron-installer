@@ -12,14 +12,16 @@ from volttron_installer.components.Header import Header
 from volttron_installer.platform_tabs.platform_config import PlatformConfig
 from volttron_installer.components.program_components.program import Program, SiblingCommunicator
 
-class ProgramTile(Program, SiblingCommunicator):
-    def __init__(self, page: Page, container, generated_url: str, title: str, event_bus) -> None:
-        super().__init__(title, page, generated_url, event_bus=event_bus)
+class ProgramTile:
+    def __init__(self, container: Container, shared_instance: Program) -> None:
+        
+        # INITIALIZE SHARED INSTANCE, HAVE SO MUCH SAVED STUFF OMG!
+        self.program = shared_instance
 
         # Subscribe to events
-        self.event_bus.subscribe("process_data", self.process_data)
+        self.program.event_bus.subscribe("process_data", self.process_data)
 
-        print(self.activity)  # Verify instantiation
+        print(self.program.activity)  # Verify instantiation
 
         self.home_container = container
         self.program_tile = self.build_tile()
@@ -35,17 +37,14 @@ class ProgramTile(Program, SiblingCommunicator):
             self.name_field, 
             self.address_field, 
             self.ports_field, 
-            self.submit_button, 
-            self.page,
-            event_bus, 
-            self.title, 
-            self.added_agents,
+            self.submit_button,
+            self.program
         ).platform_config_view()
 
 
         # Add route to dynamic routes dynamically
         view = self.program_view()
-        dynamic_routes[self.generated_url] = view
+        dynamic_routes[self.program.generated_url] = view
 
     def specific_method(self):
         print("ProgramTile.specific_method called")
@@ -57,21 +56,21 @@ class ProgramTile(Program, SiblingCommunicator):
 
 
     def get_background_color(self):
-        return "#9d9d9d" if self.activity == "ON" else colors.with_opacity(0.65, "#9d9d9d")
+        return "#9d9d9d" if self.program.activity == "ON" else colors.with_opacity(0.65, "#9d9d9d")
 
     def get_text_color(self):
-        return "white" if self.activity == "ON" else colors.with_opacity(0.65, "white")
+        return "white" if self.program.activity == "ON" else colors.with_opacity(0.65, "white")
 
     def get_status_color(self):
-        return "#00ff00" if self.activity == "ON" else colors.with_opacity(0.65, "#ff0000")
+        return "#00ff00" if self.program.activity == "ON" else colors.with_opacity(0.65, "#ff0000")
 
     def update_program_tile_ui(self):
         print("ProgramTile: updating UI...")
-        print("ProgramTile: I see activity is: ", self.activity)
+        print("ProgramTile: I see activity is: ", self.program.activity)
         # Update UI components based on activity state
         self.program_tile.bgcolor = self.get_background_color()
         self.program_tile.content.controls[0].controls[1].color = self.get_status_color()
-        self.program_tile.content.controls[0].controls[1].value = self.activity
+        self.program_tile.content.controls[0].controls[1].value = self.program.activity
         for control in self.program_tile.content.controls:
             for subcontrol in control.controls:
                 if isinstance(subcontrol, Text):
@@ -84,10 +83,10 @@ class ProgramTile(Program, SiblingCommunicator):
             border_radius=25,
             padding=padding.all(10),
             bgcolor=self.get_background_color(),
-            on_click=lambda e: self.page.go(self.generated_url),  # will lead to individualized page for managing program, testing for now
+            on_click=lambda e: self.program.page.go(self.program.generated_url),  # will lead to individualized page for managing program, testing for now
             content=Column(
                 controls=[
-                    Row(controls=[Text(self.title, color=self.get_text_color()), Text(value=f"{self.activity}", color=self.get_status_color())]),
+                    Row(controls=[Text(self.program.title, color=self.get_text_color()), Text(value=f"{self.program.activity}", color=self.get_status_color())]),
                     Row(controls=[Text("Agents"), Text("0")]),
                     Row(controls=[Text("Health"), Text("0")]),
                 ]
@@ -104,10 +103,10 @@ class ProgramTile(Program, SiblingCommunicator):
     def program_view(self) -> View:
         # Crude monolithic way of doing it but it's okay for now,
         # Initializing the header and background
-        header = Header(self.title, self.page, "/").return_header()
+        header = Header(self.program.title, self.program.page, "/").return_header()
         background_gradient = gradial_background()
         return View(
-            self.generated_url,
+            self.program.generated_url,
             controls=[
                 Stack(
                     controls=[

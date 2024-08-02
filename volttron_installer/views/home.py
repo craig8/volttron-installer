@@ -7,7 +7,6 @@ from typing import Callable
 
 import logging
 
-from volttron_installer.components.program_components.program import create_sibling_communicator
 
 _log = logging.getLogger(__name__)
 
@@ -39,11 +38,12 @@ def home_view(page: Page) -> View:
     from volttron_installer.components.program_card import program_tile_container
     from volttron_installer.components.background import gradial_background
     from volttron_installer.components.program_card import ProgramTile
-    from volttron_installer.components.program_components.program import create_sibling_communicator
+    from volttron_installer.components.program_components.program import create_sibling_communicator, Program
 
     def add_platform_tile(e) -> None:
         event_bus = create_sibling_communicator()
-        program_tile = ProgramTile(page, program_tile_container, generate_URL(), numerate_amount_of_platforms(), event_bus)
+        shared_program_instance = Program(numerate_amount_of_platforms(), page, generate_URL(), event_bus)
+        program_tile = ProgramTile(program_tile_container, shared_program_instance)
         program_tile_container.controls.append(program_tile.build_card())
         page.update()
 

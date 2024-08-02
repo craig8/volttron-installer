@@ -17,12 +17,12 @@ class SiblingCommunicator:
                 subscriber(data)
 
 class Program:
-    def __init__(self, title: str, page: Page, generated_url: str, event_bus: SiblingCommunicator, added_agents: list = None, activity: str = "OFF") -> None:
+    def __init__(self, title: str, page: Page, generated_url: str, event_bus: SiblingCommunicator) -> None:
         self.title = title
         self.page = page
         self.generated_url = generated_url
-        self.added_agents = added_agents if added_agents else []
-        self.activity: str = activity  # OFF by default
+        self.added_agents = []
+        self.activity: str = "OFF"  # OFF by default
         self.event_bus: SiblingCommunicator = event_bus  # Initialize the sibling communicator
 
     def flip_activity(self) -> None:
