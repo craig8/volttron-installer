@@ -29,22 +29,22 @@ def generate_URL() -> str:
             print(platforms_added)
             return f"/{new_url}"    
 
-def numerate_amount_of_platforms() -> int:
+def numerate_amount_of_platforms() -> str:
     platform_number = len(platforms_added)
-    return f"P{platform_number}"
+    return f"P{platform_number + 1}"
 
 def home_view(page: Page) -> View:
     from volttron_installer.views import InstallerViews as vi_views
-    from volttron_installer.components.program_card import program_tile_container
+    from volttron_installer.components.platform_tile import platform_tile_container
     from volttron_installer.components.background import gradial_background
-    from volttron_installer.components.program_card import ProgramTile
-    from volttron_installer.components.program_components.program import create_sibling_communicator, Program
+    from volttron_installer.components.platform_tile import PlatformTile
+    from volttron_installer.components.platform_components.Platform import create_sibling_communicator, Platform
 
     def add_platform_tile(e) -> None:
         event_bus = create_sibling_communicator()
-        shared_program_instance = Program(numerate_amount_of_platforms(), page, generate_URL(), event_bus)
-        program_tile = ProgramTile(program_tile_container, shared_program_instance)
-        program_tile_container.controls.append(program_tile.build_card())
+        shared_platform_instance = Platform(numerate_amount_of_platforms(), page, generate_URL(), event_bus)
+        platform_tile = PlatformTile(platform_tile_container, shared_platform_instance)
+        platform_tile_container.controls.append(platform_tile.build_card())
         page.update()
 
     compybg = gradial_background()
@@ -73,11 +73,11 @@ def home_view(page: Page) -> View:
                                     alignment=MainAxisAlignment.SPACE_BETWEEN,
                                 ),
                             ),
-                            Container(  # main view of all the program tiles
+                            Container(  # main view of all the platform tiles
                                 padding=padding.only(left=15, right=0, top=50, bottom=15),
                                 content=Column(
                                     scroll=ScrollMode.AUTO,
-                                    controls=[program_tile_container]
+                                    controls=[platform_tile_container]
                                 )
                             ),
                         ],

@@ -4,74 +4,88 @@ These objects should have the following properties:
     2. Should route to their own unique page where additional modifications can be made
 
 """ 
-from fastapi import background
 from flet import *
 from volttron_installer.modules.dynamic_routes import dynamic_routes
 from volttron_installer.components.background import gradial_background
 from volttron_installer.components.Header import Header
+from volttron_installer.platform_tabs.agent_config import AgentConfig
 from volttron_installer.platform_tabs.platform_config import PlatformConfig
-from volttron_installer.components.program_components.program import Program, SiblingCommunicator
+from volttron_installer.components.platform_components.Platform import Platform
 
-class ProgramTile:
-    def __init__(self, container: Container, shared_instance: Program) -> None:
+class PlatformTile:
+    def __init__(self, container: Container, shared_instance: Platform) -> None:
         
         # INITIALIZE SHARED INSTANCE, HAVE SO MUCH SAVED STUFF OMG!
-        self.program = shared_instance
+        self.platform = shared_instance
 
         # Subscribe to events
-        self.program.event_bus.subscribe("process_data", self.process_data)
+        self.platform.event_bus.subscribe("process_data", self.process_data)
 
-        print(self.program.activity)  # Verify instantiation
+        print(self.platform.activity)  # Verify instantiation
 
         self.home_container = container
-        self.program_tile = self.build_tile()
+        self.platform_tile = self.build_tile()
 
         # PLATFORM CONFIG SECTION
         self.name_field = TextField(hint_text="Only letters, numbers, and underscores are allowed.")
-        self.all_addresses_checkbox = Checkbox(label="All Addresses")
-        self.address_field = Container(content=self.all_addresses_checkbox)
-        self.ports_field = TextField()
+        self.addresses_text_field = TextField(label="TCP Address")
+        self.address_field = Container(content=self.addresses_text_field)
+        self.ports_field = TextField(value="22916")
         self.submit_button = OutlinedButton("Submit", disabled=True)
 
+        # AGENT COLUMNS 
+        self.platform_config_agent_column = Column(wrap=True, scroll=ScrollMode.AUTO)
+        self.agent_config_column = Column(
+            expand=3,
+            scroll=ScrollMode.AUTO,
+            alignment=MainAxisAlignment.START,
+            controls=[]
+        )
+
+        # Initilize Platform Config tab
         self.platform_config_tab = PlatformConfig(
             self.name_field, 
             self.address_field, 
             self.ports_field, 
             self.submit_button,
-            self.program
+            self.platform,
+            self.platform_config_agent_column,
+            self.agent_config_column
         ).platform_config_view()
 
+        # Initialize Agent Config tab
+        self.agent_config_tab = AgentConfig(
+            self.platform,
+            self.platform_config_agent_column,
+            self.agent_config_column
+        ).build_agent_config_tab()
 
         # Add route to dynamic routes dynamically
-        view = self.program_view()
-        dynamic_routes[self.program.generated_url] = view
+        view = self.platform_view()
+        dynamic_routes[self.platform.generated_url] = view
 
-    def specific_method(self):
-        print("ProgramTile.specific_method called")
-        # Implement specific action logic for ProgramTile
-
+    # Process subscribed event data
     def process_data(self, data):
-        print("ProgramTile received:", data)
+        print("platformTile received:", data)
         eval(data)
 
-
     def get_background_color(self):
-        return "#9d9d9d" if self.program.activity == "ON" else colors.with_opacity(0.65, "#9d9d9d")
+        return "#9d9d9d" if self.platform.activity == "ON" else colors.with_opacity(0.65, "#9d9d9d")
 
     def get_text_color(self):
-        return "white" if self.program.activity == "ON" else colors.with_opacity(0.65, "white")
+        return "white" if self.platform.activity == "ON" else colors.with_opacity(0.65, "white")
 
     def get_status_color(self):
-        return "#00ff00" if self.program.activity == "ON" else colors.with_opacity(0.65, "#ff0000")
+        return "#00ff00" if self.platform.activity == "ON" else colors.with_opacity(0.65, "#ff0000")
 
-    def update_program_tile_ui(self):
-        print("ProgramTile: updating UI...")
-        print("ProgramTile: I see activity is: ", self.program.activity)
+    def update_platform_tile_ui(self):
+        print("platformTile: updating UI...")
+        print("platformTile: I see activity is: ", self.platform.activity)
         # Update UI components based on activity state
-        self.program_tile.bgcolor = self.get_background_color()
-        self.program_tile.content.controls[0].controls[1].color = self.get_status_color()
-        self.program_tile.content.controls[0].controls[1].value = self.program.activity
-        for control in self.program_tile.content.controls:
+        self.platform_tile.bgcolor = self.get_background_color()
+        self.platform_tile.content.controls[0].controls[1].color = self.get_status_color()
+        self.platform_tile.content.controls[0].controls[1].value = self.platform.activity
+        for control in self.platform_tile.content.controls:
             for subcontrol in control.controls:
                 if isinstance(subcontrol, Text):
                     subcontrol.color = self.get_text_color()
@@ -83,10 +97,10 @@ class ProgramTile:
             border_radius=25,
             padding=padding.all(10),
             bgcolor=self.get_background_color(),
-            on_click=lambda e: self.program.page.go(self.program.generated_url),  # will lead to individualized page for managing program, testing for now
+            on_click=lambda e: self.platform.page.go(self.platform.generated_url),  # will lead to individualized page for managing platform, testing for now
             content=Column(
                 controls=[
-                    Row(controls=[Text(self.program.title, color=self.get_text_color()), Text(value=f"{self.program.activity}", color=self.get_status_color())]),
+                    Row(controls=[Text(self.platform.title, color=self.get_text_color()), Text(value=f"{self.platform.activity}", color=self.get_status_color())]),
                     Row(controls=[Text("Agents"), Text("0")]),
                     Row(controls=[Text("Health"), Text("0")]),
                 ]
@@ -94,19 +108,16 @@ class ProgramTile:
         )
 
     def build_card(self) -> Container:
-        return self.program_tile
+        return self.platform_tile
     
-    # @classmethod
-    # def override_update_ui(cls) -> None:
-    #     Program.update_program_tile_ui = cls.update_program_tile_ui
 
-    def program_view(self) -> View:
+    def platform_view(self) -> View:
         # Crude monolithic way of doing it but it's okay for now,
         # Initializing the header and background
-        header = Header(self.program.title, self.program.page, "/").return_header()
+        header = Header(self.platform.title, self.platform.page, "/").return_header()
         background_gradient = gradial_background()
         return View(
-            self.program.generated_url,
+            self.platform.generated_url,
             controls=[
                 Stack(
                     controls=[
@@ -123,11 +134,11 @@ class ProgramTile:
                                             content=self.platform_config_tab
                                         ),
                                         Tab(
-                                            tab_content=Icon(icons.SEARCH),
-                                            content=Text("This is Tab 2"),
+                                            text="Agent Config",
+                                            content=self.agent_config_tab,
                                         ),
                                         Tab(
-                                            text="Tab 3",
+                                            text="Config Store Manager",
                                             icon=icons.SETTINGS,
                                             content=Text("This is Tab 3"),
                                         ),
@@ -143,5 +154,5 @@ class ProgramTile:
             padding=0
         )
 
-# Container to hold program tiles
-program_tile_container = Row(wrap=True)
+# Container to hold platform tiles
+platform_tile_container = Row(wrap=True)
