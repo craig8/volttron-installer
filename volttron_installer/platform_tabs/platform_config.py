@@ -1,5 +1,4 @@
 from flet import *
-from volttron_installer.modules.validate_field import validate_text
 from volttron_installer.components.platform_components.Platform import Platform
 from volttron_installer.components.Agent import Agent
 
@@ -10,7 +9,6 @@ class PlatformConfig:
             name_field,
             addresses_field,
             ports_field,
-            submit_button,
             shared_instance: Platform,
             platform_config_agent_column,
             agent_config_column
@@ -22,7 +20,7 @@ class PlatformConfig:
         # Name field formation
         self.name_field = name_field
         self.name_field.value = self.platform.title  # Set the value of the name field to the title
-        self.name_field.on_change = lambda e: validate_text(self.name_field, self.submit_button)
+        self.name_field.on_change = lambda e: self.validate_text(self.name_field)
         
         # Adress field formation
         self.addresses_field = addresses_field
@@ -32,9 +30,6 @@ class PlatformConfig:
         self.ports_field = ports_field
         self.ports_field_pair = self.field_pair("Ports", self.ports_field)
         
-        # Submit butto formation
-        self.submit_button = submit_button
-        self.submit_button.on_click = self.deploy_to_platform
 
         # Agent dropdown formation
         self.agent_dropdown = self.numerate_agent_dropdown()
@@ -89,13 +84,30 @@ class PlatformConfig:
                             spacing=0,
                             controls=[
                                 Container(expand=3, padding=padding.only(left=4), content=self.platform_config_agent_column),
-                                Container(expand=2, content=Stack(controls=[Container(bottom=10, right=10, height=50, width=100, content=self.submit_button)]))
                             ]
                         )
                     )
                 ]
             )
-        )
+        )  
+    # lowkey a repeated ahh function from modules.validate_field XDDDDD
+    def validate_text(self, text_field: TextField) -> None:
+        """
+        Validates the text in `text_field`
+
+        Args:
+            text_field (TextField): The text field to validate.
+        """
+        valid_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
+        input_text = text_field.value
+        if all(c in valid_chars for c in input_text):
+            text_field.error_text = None
+            self.platform.event_bus.publish("deploy_button_update", False)
+        else:
+            text_field.error_text = "Only letters, numbers, and underscores are allowed."
+            self.platform.event_bus.publish("deploy_button_update", True)
+
+        text_field.update()
 
     # function to clean up GUI, divides up the fieds with dividers
     def divide_fields(self, field_list) -> list:
@@ -131,11 +143,6 @@ class PlatformConfig:
 
             # Tell Agent Config to update their row 
             self.platform.event_bus.publish("append_agent_row", "self.append_agent_row()")
-
-    def deploy_to_platform(self, e) -> None:
-        self.platform.flip_activity()
-        # Tell PlatformTile to update their UI after submission
-        self.platform.event_bus.publish('process_data', "self.update_platform_tile_ui()")
 
     def platform_config_view(self) -> Container:
         return self.comprehensive_view

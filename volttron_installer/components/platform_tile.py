@@ -20,6 +20,7 @@ class PlatformTile:
 
         # Subscribe to events
         self.platform.event_bus.subscribe("process_data", self.process_data)
+        self.platform.event_bus.subscribe("deploy_all_data", self.process_data)
 
         print(self.platform.activity)  # Verify instantiation
 
@@ -47,7 +48,6 @@ class PlatformTile:
             self.name_field, 
             self.address_field, 
             self.ports_field, 
-            self.submit_button,
             self.platform,
             self.platform_config_agent_column,
             self.agent_config_column
@@ -69,6 +69,22 @@ class PlatformTile:
         print("platformTile received:", data)
         eval(data)
 
+    def submit_fields(self):
+        self.platform.title = self.name_field.value
+        self.platform.address = self.addresses_text_field.value
+        self.platform.ports = self.ports_field.value 
+        self.update_platform_tile_ui()
+
+        # TESTING BLOCK
+        print("\nWE UPDATING LETS GET ITTTT")
+        print(self.platform.title)
+        print(self.platform.address)
+        print(self.platform.ports)
+        print("\nHoly guacamole so much changed! --->")
+        print(self.platform.title)
+        print(self.platform.address)
+        print(self.platform.ports)
+
     def get_background_color(self):
         return "#9d9d9d" if self.platform.activity == "ON" else colors.with_opacity(0.65, "#9d9d9d")
 
@@ -84,6 +100,7 @@ class PlatformTile:
         # Update UI components based on activity state
         self.platform_tile.bgcolor = self.get_background_color()
         self.platform_tile.content.controls[0].controls[1].color = self.get_status_color()
+        self.platform_tile.content.controls[0].controls[0].value = self.platform.title
         self.platform_tile.content.controls[0].controls[1].value = self.platform.activity
         for control in self.platform_tile.content.controls:
             for subcontrol in control.controls:
@@ -97,7 +114,7 @@ class PlatformTile:
             border_radius=25,
             padding=padding.all(10),
             bgcolor=self.get_background_color(),
-            on_click=lambda e: self.platform.page.go(self.platform.generated_url),  # will lead to individualized page for managing platform, testing for now
+            on_click=lambda e: self.platform.page.go(self.platform.generated_url),# routes to individualized page for managing platform
             content=Column(
                 controls=[
                     Row(controls=[Text(self.platform.title, color=self.get_text_color()), Text(value=f"{self.platform.activity}", color=self.get_status_color())]),
@@ -109,12 +126,12 @@ class PlatformTile:
 
     def build_card(self) -> Container:
         return self.platform_tile
-    
+
 
     def platform_view(self) -> View:
         # Crude monolithic way of doing it but it's okay for now,
         # Initializing the header and background
-        header = Header(self.platform.title, self.platform.page, "/").return_header()
+        header = Header(self.platform, self.submit_button, "/").return_header()
         background_gradient = gradial_background()
         return View(
             self.platform.generated_url,

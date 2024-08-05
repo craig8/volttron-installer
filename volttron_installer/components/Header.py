@@ -1,12 +1,18 @@
 from flet import *
 from volttron_installer.modules.validate_field import validate_text
+from volttron_installer.components.platform_components.Platform import Platform
 
 class Header:
-    def __init__(self, title: str, page: Page, route: str):
-        self.title: str = title
-        self.page: Page = page
+    def __init__(self, shared_instance, submit_button: OutlinedButton, route: str):
+        self.platform: Platform = shared_instance
         self.route_back_to: str = route
         self.edit_mode: bool = False
+
+        self.deploy_button = submit_button
+        self.deploy_button.on_click = self.deploy_platform
+
+        # Subscribe to events ->:
+        self.platform.event_bus.subscribe("deploy_button_update", self.adjust_submit_validity)
 
         # establish editing logic for to flip flop between the two icons
         self.editing_icon = icons.EDIT
@@ -16,9 +22,9 @@ class Header:
         self.edit_delete_grouped = Container(content=Row(controls=[self.edit_program_title_button, self.delete_program_button]))
 
         # logic for the title editing functionality
-        self.title_container = Container(visible=not self.edit_mode, content=Text(value=f"{self.title}", size=24))
-        self.title_editing_field = TextField(value=self.title, visible=self.edit_mode, width=100, on_change=lambda e: validate_text(self.title_editing_field, self.edit_program_title_button))
-        self.title_edit_container = Row(controls=[self.title_container, self.title_editing_field])
+        self.title_container = Container(visible=not self.edit_mode, content=Text(value=f"{self.platform.title}", size=24))
+        self.title_editing_field = TextField(value=self.platform.title, visible=self.edit_mode, width=100, on_change=lambda e: validate_text(self.title_editing_field, self.edit_program_title_button))
+        self.title_edit_container = Row(controls=[self.title_container, self.title_editing_field], wrap=True)
 
         self.header = Container(  # header
             padding=padding.only(left=20, right=20, top=20),
@@ -27,30 +33,47 @@ class Header:
                 wrap=True,
                 controls=[
                     Row(
+                        #wrap=True,
                         controls=[
-                            Row(
-                                controls=[
-                                    IconButton(
-                                        icon=icons.ARROW_BACK_IOS_NEW,
-                                        tooltip="Add platform",
-                                        icon_color="white",
-                                        icon_size=25,
-                                        on_click=lambda e: self.page.go(self.route_back_to)
-                                    ),
-                                    self.title_edit_container
-                                ]
+                            IconButton(
+                                icon=icons.ARROW_BACK_IOS_NEW,
+                                tooltip="Add platform",
+                                icon_color="white",
+                                icon_size=25,
+                                on_click=lambda e: self.platform.page.go(self.route_back_to)
                             ),
-                            Container(
-                                content=Row(
-                                    controls=[self.edit_delete_grouped]
-                                )
-                            )
+                            self.title_edit_container
                         ]
                     ),
+                    Container(
+                        content=Row(
+                            controls=[self.edit_delete_grouped, self.deploy_button]
+                        )
+                    )
                 ],
                 alignment=MainAxisAlignment.SPACE_BETWEEN,
             ),
         )
+
+    def deploy_platform(self, e) -> None:
+        print("Header: everyone update their UI!")
+        self.platform.flip_activity()
+
+        # Make platformTile push all data entries into the shared instance
+        self.platform.event_bus.publish("deploy_all_data", "self.submit_fields()")
+        self.platform.page.update()
+        self.header.update()
+    
+
+    def adjust_submit_validity(self, state: bool):
+        # set the boolean to the button's disabled state
+        self.deploy_button.disabled = state
+        self.deploy_button.update()
+
+    def deploy_to_platform(self, e) -> None:
+        self.platform.flip_activity()
+        # Tell PlatformTile to update their UI after submission
+        self.platform.event_bus.publish('process_data', "self.update_platform_tile_ui()")
 
     def delete_thang(self, e) -> None:
         print("You have deleted me how dare you!")
@@ -68,7 +91,7 @@ class Header:
 
         # update the editing icon
         self.edit_program_title_button.icon = icons.SAVE if self.edit_mode else icons.EDIT
-        self.page.update()
+        self.platform.page.update()
 
     def return_header(self) -> Container:
         return self.header

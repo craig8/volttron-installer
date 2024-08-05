@@ -51,10 +51,6 @@ class Platform:
         self.activity = "OFF" if self.activity == "ON" else "ON"
         print(f"Platform: I turned activity to: {self.activity}") # Debug print
 
-    def send_signal(self, data):
-        print("Platform: Sending signal with data")  # Debug print
-        self.event_bus.publish("process_data", data)
-
 
 def create_sibling_communicator():
     return ObjectCommunicator()

@@ -21,13 +21,14 @@ def generate_random_path(length=7) -> str:
     characters = string.ascii_letters + string.digits
     return ''.join(random.choice(characters) for _ in range(length))
 
+# Generates until URL is unique
 def generate_URL() -> str:
     while True:
         new_url = generate_random_path()
-        if new_url not in platforms_added:
-            platforms_added.append(new_url)
-            print(platforms_added)
-            return f"/{new_url}"    
+        generated_url = f"/{new_url}"
+        if generated_url not in platforms_added:
+            platforms_added.append(generated_url)
+            return generated_url
 
 def numerate_amount_of_platforms() -> str:
     platform_number = len(platforms_added)
