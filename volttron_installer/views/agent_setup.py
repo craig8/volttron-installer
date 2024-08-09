@@ -3,6 +3,7 @@ from flet import *
 import json
 from volttron_installer.modules.field_methods import field_pair, divide_fields
 from volttron_installer.modules.global_configs import global_agents
+from volttron_installer.components.default_tile_styles import build_default_tile
 
 # this whole file is basically a copy of hosts_tab.py hahahaahahpfioahah aaawawpb
 # ok so when i properly save an agent, its going to publish an event_bus called
@@ -22,36 +23,23 @@ class Agent:
     ssh_port: str # string for now
 
     def remove_self(self, e) -> None:
-        pass
+        print("Yeah, agent_setup.py self.remove works")
 
-    def build_host_tile(self) -> Container:
-        delete_button = IconButton(
-            icon=icons.DELETE,
-            on_click=self.remove_self
-        )
-        return Container(
-            border_radius=15,
-            padding=padding.only(left=7,right=7,top=5,bottom=5),
-            bgcolor=colors.with_opacity(0.5, colors.BLUE_GREY_300),
-            content=Row(
-                controls=[
-                    Text(value=self.agent_name),
-                    delete_button
-                ],
-                alignment=MainAxisAlignment.SPACE_BETWEEN
-            )
-        )
+    def build_agent_tile(self) -> Container:
+        agent_tile = build_default_tile(self.agent_name)
+        agent_tile.content.controls[1].on_click = self.remove_self
+        return agent_tile
 
 class FormTemplate:
-    def __init__(self, page: Page, host: Agent, host_tile: Container):
+    def __init__(self, page: Page, agent: Agent, host_tile: Container):
         self.page = page
-        self.host = host
-        self.host_tile = host_tile
+        self.agent = agent
+        self.agent_tile = host_tile
 
         self.agent_name_field = TextField(on_change=self.validate_submit)
         self.default_identity_field = TextField(on_change=self.validate_submit)
         self.agent_path_field = TextField(on_change=self.validate_submit)
-        self.agent_configuration_field = TextField(on_change=self.validate_submit)
+        self.agent_configuration_field = TextField(value="",on_change=self.validate_submit)
         self.config_store_entry_key = RadioGroup(
                                         value="",
                                         on_change=self.validate_submit,
@@ -79,34 +67,34 @@ class FormTemplate:
                     )
         
     def save_host_config(self, e):
-        self.host.default_identity = self.default_identity_field.value
-        self.host.agent_path = self.agent_path_field.value
-        self.host.agent_configuration = self.agent_configuration_field.value
-        self.host.ssh_port = self.config_store_entry_key.value
+        self.agent.default_identity = self.default_identity_field.value
+        self.agent.agent_path = self.agent_path_field.value
+        self.agent.agent_configuration = self.agent_configuration_field.value
+        self.agent.ssh_port = self.config_store_entry_key.value
         # Save old name to variable
-        old_name = self.host.agent_name
+        old_name = self.agent.agent_name
         # Then re-assign new name
-        self.host.agent_name = self.agent_name_field.value
+        self.agent.agent_name = self.agent_name_field.value
 
         if old_name in global_agents.keys():
             # Re-assign new name to agent
-            global_agents[self.host.agent_name] = global_agents.pop(old_name)
-            agent_dict = global_agents[self.host.agent_name]
+            global_agents[self.agent.agent_name] = global_agents.pop(old_name)
+            agent_dict = global_agents[self.agent.agent_name]
 
             # Update agent details
-            agent_dict["default_identity"] = self.host.default_identity
-            agent_dict["agent_path"] = self.host.agent_path
-            agent_dict["agent_configuration"] = self.host.agent_configuration
+            agent_dict["default_identity"] = self.agent.default_identity
+            agent_dict["agent_path"] = self.agent.agent_path
+            agent_dict["agent_configuration"] = self.agent.agent_configuration
 
         else:
             agent_dictionary_appendable = {
-                "default_identity": self.host.default_identity,
-                "agent_path": self.host.agent_path,
-                "agent_configuration": self.host.agent_configuration,
+                "default_identity": self.agent.default_identity,
+                "agent_path": self.agent.agent_path,
+                "agent_configuration": self.agent.agent_configuration,
             }
-            global_agents[self.host.agent_name] = agent_dictionary_appendable
+            global_agents[self.agent.agent_name] = agent_dictionary_appendable
 
-        self.host_tile.content.controls[0].value = self.host.agent_name
+        self.agent_tile.content.controls[0].value = self.agent.agent_name
         self.page.update()
         print(global_agents)
 
@@ -147,7 +135,7 @@ class FormTemplate:
             self.submit_button.disabled = True
         self.submit_button.update()
     
-    def build_host_form(self) -> Column:
+    def build_agent_form(self) -> Column:
         return self._form
 
 
@@ -161,10 +149,10 @@ class AgentSetupTab:
         self.list_of_hosts = Column(
                                 expand=2,
                                 controls=[
-                                    OutlinedButton(text="Setup an Agent", on_click=self.add_new_host)
+                                    OutlinedButton(text="Setup an Agent", on_click=self.add_new_agent)
                                 ]
                             )
-        self.host_tab_view=Container(
+        self.agent_tab_view=Container(
                                 padding=padding.only(left=10),
                                 margin=margin.only(left=10, right=10, bottom=5, top=5),
                                 bgcolor="#20f4f4f4",
@@ -178,7 +166,7 @@ class AgentSetupTab:
                                 )
                             ) 
 
-    def add_new_host(self, e) -> None:
+    def add_new_agent(self, e) -> None:
         new_host = Agent(
                 agent_name="New Agent",
                 default_identity="",
@@ -186,17 +174,17 @@ class AgentSetupTab:
                 agent_configuration="",
                 ssh_port=""
             )
-        host_tile = new_host.build_host_tile()
+        host_tile = new_host.build_agent_tile()
         host_form = FormTemplate(self.page, new_host, host_tile)
-        host_tile.on_click=lambda e: self.host_is_selected(e, host_form, host_tile)
+        host_tile.on_click=lambda e: self.agent_is_selected(e, host_form, host_tile)
         self.list_of_hosts.controls.append(host_tile)
         self.list_of_hosts.update()
 
 
-    def host_is_selected(self, e, host_form: FormTemplate, host_tile: Container) -> None:
-        self.host_tab_view.content.controls[2] = host_form.build_host_form()
+    def agent_is_selected(self, e, host_form: FormTemplate, host_tile: Container) -> None:
+        self.agent_tab_view.content.controls[2] = host_form.build_agent_form()
         self.page.update()
 
 
     def build_agent_setup_tab(self)-> Container:
-        return self.host_tab_view
+        return self.agent_tab_view

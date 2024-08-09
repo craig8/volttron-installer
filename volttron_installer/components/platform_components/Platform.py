@@ -12,6 +12,8 @@ own self.functions() or just interpret the data that have been sent from other m
 """
 
 from flet import Page
+from volttron_installer.modules.global_configs import global_hosts, global_agents
+
 
 class ObjectCommunicator:
     """An object first subscribes to a specific event_type/signal and inputs their
@@ -43,9 +45,16 @@ class Platform:
         self.bus_type= "Zmq"
         self.ports = ""
 
+        self.added_hosts = {}
         self.added_agents = {} # agent name : [agent object, custom JSON (defaults to False if none)]
         self.activity: str = "OFF"  # OFF by default
         self.event_bus: ObjectCommunicator = event_bus  # Initialize the Object communicator
+
+    def populate_registered_hosts(self) -> dict:
+        pass
+
+    def populate_added_agents(self) -> dict:
+        pass
 
     def flip_activity(self) -> None:
         self.activity = "OFF" if self.activity == "ON" else "ON"

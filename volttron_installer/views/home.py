@@ -7,6 +7,8 @@ from typing import Callable
 
 import logging
 
+from volttron_installer.views import hosts_tab
+
 
 _log = logging.getLogger(__name__)
 
@@ -36,6 +38,7 @@ def numerate_amount_of_platforms() -> str:
 
 def home_view(page: Page) -> View:
     from volttron_installer.views import InstallerViews as vi_views
+    from volttron_installer.views import agent_setup, hosts_tab
     from volttron_installer.components.platform_tile import platform_tile_container
     from volttron_installer.components.background import gradial_background
     from volttron_installer.components.platform_tile import PlatformTile
@@ -48,15 +51,17 @@ def home_view(page: Page) -> View:
         platform_tile_container.controls.append(platform_tile.build_card())
         page.update()
 
-    compybg = gradial_background()
+    agent_setup_tab = agent_setup.AgentSetupTab(page).build_agent_setup_tab()
+    host_config_tab = hosts_tab.HostTab(page).build_hosts_tab()
+
+    background_gradient = gradial_background()
     return View(
         "/",
         controls=[
             Stack(
                 controls=[
-                    compybg,
+                    background_gradient,
                     Column(
-                        scroll=ScrollMode.AUTO,
                         controls=[
                             Container(  # header
                                 padding=padding.only(left=20, right=20),
@@ -74,19 +79,37 @@ def home_view(page: Page) -> View:
                                     alignment=MainAxisAlignment.SPACE_BETWEEN,
                                 ),
                             ),
-                            Container(  # main view of all the platform tiles
-                                padding=padding.only(left=15, right=0, top=50, bottom=15),
-                                content=Column(
-                                    scroll=ScrollMode.AUTO,
-                                    controls=[platform_tile_container]
-                                )
-                            ),
+                            Tabs(
+                                selected_index=0,
+                                animation_duration=300,
+                                tabs=[
+                                    Tab(
+                                        text="Platforms",
+                                        content= Container(  # main view of all the platform tiles
+                                            padding=padding.only(left=15, right=0, top=50, bottom=15),
+                                            content=Column(
+                                                scroll=ScrollMode.AUTO,
+                                                controls=[platform_tile_container]
+                                            )
+                                        )
+                                    ),
+                                    Tab(
+                                        text="Agent Setup",
+                                        content=agent_setup_tab
+                                    ),
+                                    Tab(
+                                        text="Hosts",
+                                        content=host_config_tab
+                                    )
+                                ],
+                                expand=1
+                            )
                         ],
                         expand=True
                     ),
                 ],
-                expand=True
-            ),
+            expand=True
+            )
         ],
         padding=0
     )

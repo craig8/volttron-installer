@@ -72,6 +72,7 @@ class PlatformConfig:
             bgcolor="#20f4f4f4",
             border_radius=12,
             content=Column(
+                scroll=ScrollMode.AUTO,
                 alignment=MainAxisAlignment.START,
                 spacing=10,  # Adjusted spacing for better separation
                 controls=[
@@ -88,7 +89,6 @@ class PlatformConfig:
                         )
                     ),
                     Container(
-                        expand=True,
                         content=Row(
                             spacing=0,
                             controls=[

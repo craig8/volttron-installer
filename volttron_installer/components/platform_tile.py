@@ -135,12 +135,6 @@ class PlatformTile:
 
 
     def platform_view(self) -> View:
-        # JUST A BUNCH OF TESTIGN AND WHAT NOT
-        from volttron_installer.views.hosts_tab import HostTab
-        from volttron_installer.views.agent_setup import AgentSetupTab
-        agent_setup_tab = AgentSetupTab(self.platform.page).build_agent_setup_tab()
-        host_tab = HostTab(self.platform.page).build_hosts_tab()
-
         # Crude monolithic way of doing it but it's okay for now,
         # Initializing the header and background
         header = Header(self.platform, self.submit_button, "/").return_header()
@@ -171,14 +165,6 @@ class PlatformTile:
                                                 ],
                                                 scroll=ScrollMode.ADAPTIVE,
                                             )
-                                        ),
-                                         Tab( # TESTING HOW HOST TAB LOOKS BEFORE FIXING MAIN MENU
-                                             text="Testing",
-                                             content=host_tab,
-                                        ),
-                                        Tab(
-                                            text="a little bit of more testing",
-                                            content=agent_setup_tab
                                         )
                                     ],
                                     expand=1,
@@ -186,7 +172,7 @@ class PlatformTile:
                             ]
                         ),
                     ],
-                    expand=True
+                expand=True
                 )
             ],
             padding=0
