@@ -1,5 +1,5 @@
 """
-    Using shared instances (Composition) seemed more intuitve because 
+Using shared instances (Composition) seemed more intuitve because 
 as this project grows, it would be easier to use this central psuedo database rather than 
 parent class that would need constant re-initalization. The shared Instance uses 1
 consistent initialized object making state sharing easy. Each object sharing this shared
@@ -8,7 +8,7 @@ state changes very easily while allowing these disconnected objects to be as mod
 possible. In heriently, with a shared isntance structure, communictation between different
 modules may be less intuitive than inheritance but i believe that this is solved by the ObjectCommunicator
 class, which allows for objects to subscribe to and recieve specific signals so they can execute their
-own self.functions() that have been called from other modules!
+own self.functions() or just interpret the data that have been sent from other modules!
 """
 
 from flet import Page

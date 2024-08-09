@@ -36,6 +36,7 @@ class AgentConfig:
 
         self.divider = VerticalDivider(color="white", width=9, thickness=3)
         self._comprehensive_view = Container(
+            height=600,
             margin=margin.only(left=10, right=10, bottom=5, top=5),
             bgcolor="#20f4f4f4",
             border_radius=12,

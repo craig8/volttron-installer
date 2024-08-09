@@ -5,12 +5,14 @@ These objects should have the following properties:
 
 """ 
 from flet import *
+from uvicorn import Config
 from volttron_installer.modules.dynamic_routes import dynamic_routes
 from volttron_installer.components.background import gradial_background
 from volttron_installer.components.Header import Header
 from volttron_installer.platform_tabs.agent_config import AgentConfig
 from volttron_installer.platform_tabs.platform_config import PlatformConfig
 from volttron_installer.components.platform_components.Platform import Platform
+from volttron_installer.platform_tabs.config_store_manager import ConfigStoreManager
 
 class PlatformTile:
     def __init__(self, container: Container, shared_instance: Platform) -> None:
@@ -32,7 +34,12 @@ class PlatformTile:
         self.addresses_text_field = TextField(label="TCP Address")
         self.address_field = Container(content=self.addresses_text_field)
         self.ports_field = TextField(value="22916")
-        self.submit_button = OutlinedButton("Submit", disabled=True)
+        self.submit_button = OutlinedButton("Deploy Platform", disabled=True)
+        self.host_field = Dropdown(
+            options=[
+                dropdown.Option("HOSTEY")
+            ]
+        )
 
         # AGENT COLUMNS 
         self.platform_config_agent_column = Column(wrap=True, scroll=ScrollMode.AUTO)
@@ -50,6 +57,7 @@ class PlatformTile:
             self.ports_field, 
             self.platform,
             self.platform_config_agent_column,
+            self.host_field,
             self.agent_config_column
         ).platform_config_view()
 
@@ -59,6 +67,11 @@ class PlatformTile:
             self.platform_config_agent_column,
             self.agent_config_column
         ).build_agent_config_tab()
+
+        self.config_store_tab = ConfigStoreManager(
+            self.platform.page,
+            self.platform
+        ).build_store_view()
 
         # Add route to dynamic routes dynamically
         view = self.platform_view()
@@ -75,16 +88,6 @@ class PlatformTile:
         self.platform.ports = self.ports_field.value 
         self.update_platform_tile_ui()
 
-        # TESTING BLOCK
-        print("\nWE UPDATING LETS GET ITTTT")
-        print(self.platform.title)
-        print(self.platform.address)
-        print(self.platform.ports)
-        print("\nHoly guacamole so much changed! --->")
-        print(self.platform.title)
-        print(self.platform.address)
-        print(self.platform.ports)
-
     def get_background_color(self):
         return "#9d9d9d" if self.platform.activity == "ON" else colors.with_opacity(0.65, "#9d9d9d")
 
@@ -99,13 +102,16 @@ class PlatformTile:
         print("platformTile: I see activity is: ", self.platform.activity)
         # Update UI components based on activity state
         self.platform_tile.bgcolor = self.get_background_color()
-        self.platform_tile.content.controls[0].controls[1].color = self.get_status_color()
         self.platform_tile.content.controls[0].controls[0].value = self.platform.title
         self.platform_tile.content.controls[0].controls[1].value = self.platform.activity
+        self.platform_tile.content.controls[1].controls[1].value = len(self.platform.added_agents)
         for control in self.platform_tile.content.controls:
             for subcontrol in control.controls:
                 if isinstance(subcontrol, Text):
                     subcontrol.color = self.get_text_color()
+
+        # Override blanket re-styling of text
+        self.platform_tile.content.controls[0].controls[1].color = self.get_status_color()
 
     def build_tile(self):
         return Container(
@@ -118,8 +124,8 @@ class PlatformTile:
             content=Column(
                 controls=[
                     Row(controls=[Text(self.platform.title, color=self.get_text_color()), Text(value=f"{self.platform.activity}", color=self.get_status_color())]),
-                    Row(controls=[Text("Agents"), Text("0")]),
-                    Row(controls=[Text("Health"), Text("0")]),
+                    Row(controls=[Text("Running Agents"), Text("0")]),
+                    Row(controls=[Text("Healthy Agents"), Text("0")]),
                 ]
             )
         )
@@ -129,6 +135,12 @@ class PlatformTile:
 
 
     def platform_view(self) -> View:
+        # JUST A BUNCH OF TESTIGN AND WHAT NOT
+        from volttron_installer.views.hosts_tab import HostTab
+        from volttron_installer.views.agent_setup import AgentSetupTab
+        agent_setup_tab = AgentSetupTab(self.platform.page).build_agent_setup_tab()
+        host_tab = HostTab(self.platform.page).build_hosts_tab()
+
         # Crude monolithic way of doing it but it's okay for now,
         # Initializing the header and background
         header = Header(self.platform, self.submit_button, "/").return_header()
@@ -152,13 +164,22 @@ class PlatformTile:
                                         ),
                                         Tab(
                                             text="Agent Config",
-                                            content=self.agent_config_tab,
+                                            content=Column(
+                                                controls=[    
+                                                    self.agent_config_tab,
+                                                    self.config_store_tab
+                                                ],
+                                                scroll=ScrollMode.ADAPTIVE,
+                                            )
+                                        ),
+                                         Tab( # TESTING HOW HOST TAB LOOKS BEFORE FIXING MAIN MENU
+                                             text="Testing",
+                                             content=host_tab,
                                         ),
                                         Tab(
-                                            text="Config Store Manager",
-                                            icon=icons.SETTINGS,
-                                            content=Text("This is Tab 3"),
-                                        ),
+                                            text="a little bit of more testing",
+                                            content=agent_setup_tab
+                                        )
                                     ],
                                     expand=1,
                                 )

@@ -1,6 +1,7 @@
 from flet import *
 from volttron_installer.components.platform_components.Platform import Platform
 from volttron_installer.components.Agent import Agent
+from volttron_installer.modules.field_methods import field_pair, divide_fields
 
 
 class PlatformConfig:
@@ -11,11 +12,15 @@ class PlatformConfig:
             ports_field,
             shared_instance: Platform,
             platform_config_agent_column,
+            host_field,
             agent_config_column
         ) -> None:
         
         #INITIALIZE THE SHARED INSTANCE
         self.platform = shared_instance
+
+        self.field_pair = field_pair
+        self.divide_fields = divide_fields
 
         # Name field formation
         self.name_field = name_field
@@ -47,10 +52,14 @@ class PlatformConfig:
         self.platform_config_agent_column = platform_config_agent_column
 
 
+        self.host_field = host_field
+        self.host_field_pair = self.field_pair("Host", self.host_field)
+        
         self.bus_field_pair = self.field_pair("Bus Type", Text("Zmq", size=18, color="white"))
 
         # GROUPING THEN FORMATION FIELDS
         self.almost_fields = [
+            self.host_field_pair,            
             self.field_pair("Name", self.name_field),
             self.address_field_pair,
             self.ports_field_pair,
@@ -59,7 +68,7 @@ class PlatformConfig:
         self.all_fields_formatted = self.divide_fields(self.almost_fields)
 
         self.comprehensive_view = Container(
-            margin=margin.only(left=20, right=20, bottom=20, top=20),
+            margin=margin.only(left=10, right=10, bottom=5, top=5),
             bgcolor="#20f4f4f4",
             border_radius=12,
             content=Column(
@@ -90,6 +99,7 @@ class PlatformConfig:
                 ]
             )
         )  
+
     # lowkey a repeated ahh function from modules.validate_field XDDDDD
     def validate_text(self, text_field: TextField) -> None:
         """
@@ -106,27 +116,7 @@ class PlatformConfig:
         else:
             text_field.error_text = "Only letters, numbers, and underscores are allowed."
             self.platform.event_bus.publish("deploy_button_update", True)
-
         text_field.update()
-
-    # function to clean up GUI, divides up the fieds with dividers
-    def divide_fields(self, field_list) -> list:
-        div = Divider(height=9, thickness=3, color="white")
-        return [element for pair in zip(field_list, [div] * (len(field_list) - 1)) for element in pair] + [field_list[-1], div]
-
-    # creat a field pair 
-    def field_pair(self, field_title, input) -> Container:
-        return Container(
-            height=70,
-            padding=padding.only(top=10, bottom=10, left=5, right=5),
-            content=Row(
-                controls=[
-                    Container(expand=2, content=Text(f"{field_title}", size=20)),
-                    Container(expand=3, content=input)
-                ],
-                spacing=0
-            )
-        )
 
     # grab all Agent names that were available to me 
     def numerate_agent_dropdown(self) -> Dropdown:

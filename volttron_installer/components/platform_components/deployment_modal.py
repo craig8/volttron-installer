@@ -145,7 +145,7 @@ and display itself.
                  controls=[]
             )
             self.modal_structure = AlertDialog(
-                modal=False,
+                modal=True,
                 bgcolor="#00000000",
                 content=Container(
                     **modal_styles(),
