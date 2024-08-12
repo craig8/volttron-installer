@@ -8,10 +8,10 @@ from flet import *
 from uvicorn import Config
 from volttron_installer.modules.dynamic_routes import dynamic_routes
 from volttron_installer.components.background import gradial_background
-from volttron_installer.components.Header import Header
+from volttron_installer.components.header import Header
 from volttron_installer.platform_tabs.agent_config import AgentConfig
 from volttron_installer.platform_tabs.platform_config import PlatformConfig
-from volttron_installer.components.platform_components.Platform import Platform
+from volttron_installer.components.platform_components.platform import Platform
 from volttron_installer.platform_tabs.config_store_manager import ConfigStoreManager
 
 class PlatformTile:
@@ -135,7 +135,6 @@ class PlatformTile:
 
 
     def platform_view(self) -> View:
-        # Crude monolithic way of doing it but it's okay for now,
         # Initializing the header and background
         header = Header(self.platform, self.submit_button, "/").return_header()
         background_gradient = gradial_background()

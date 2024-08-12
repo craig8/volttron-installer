@@ -1,6 +1,6 @@
 from flet import *
-from volttron_installer.components.Agent import Agent
-from volttron_installer.components.platform_components.Platform import Platform
+from volttron_installer.components.agent import Agent
+from volttron_installer.components.platform_components.platform import Platform
 
 class AgentConfig:
     def __init__(self, shared_instance: Platform, platform_config_column, agent_config_column) -> None:

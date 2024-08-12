@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from volttron_installer.modules.styles import modal_styles
+from volttron_installer.components.default_tile_styles import build_default_tile
 from flet import *
 
 @dataclass
@@ -11,11 +12,14 @@ class ConfigTile:
     display_container: Container
 
     def build_config_tile(self) -> Container:
-        return Container(
-            bgcolor="orange", # debugging style
-            content=Text(value=self.name),
-            on_click=self.display_content
-        )
+        config_tile = build_default_tile(self.name)
+
+        config_tile.content.controls[1].on_click = self.delete_self
+        config_tile.on_click = self.display_content
+        return config_tile
+    
+    def delete_self(self, e):
+        print("ConfigTile: this is just endless suffering please program me to delete myself")
 
     def display_content(self, e) -> None:
         config_content = Container(
@@ -24,10 +28,19 @@ class ConfigTile:
         self.display_container.content = config_content
         self.display_container.update()
 
-class ConfigStoreManager:
+from volttron_installer.components.platform_components.platform import Platform
 
-    def __init__(self, page: Page, platform_specific: bool) -> None:
+class ConfigStoreManager:
+    def __init__(self, page: Page, platform_specific: any) -> None:
         self.page = page
+
+        self.platform = platform_specific
+        if isinstance(self.platform, Platform):
+            self.platform.event_bus.subscribe("agent_is_selected", self.display_agent_specific)
+        else:
+            # activate function that displays global driver configs 
+            pass
+
         self.name_field = TextField(color="black", label="Name", on_change=self.validate_submit)
         self.csv_radio = Radio(value="csv")
         self.json_radio = Radio(value="json")
@@ -123,6 +136,9 @@ class ConfigStoreManager:
                 Text(label, color="black")
             ]
         )
+
+    def display_agent_specific(self):
+        print("config store manager says wsg w gangalaunche")
 
     def validate_submit(self, e) -> None:
         if self.name_field.value and self.type_radio_group.value !="":

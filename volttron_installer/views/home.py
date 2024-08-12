@@ -42,8 +42,7 @@ def home_view(page: Page) -> View:
     from volttron_installer.components.platform_tile import platform_tile_container
     from volttron_installer.components.background import gradial_background
     from volttron_installer.components.platform_tile import PlatformTile
-    from volttron_installer.components.platform_components.Platform import create_sibling_communicator, Platform
-
+    from volttron_installer.components.platform_components.platform import create_sibling_communicator, Platform
     def add_platform_tile(e) -> None:
         event_bus = create_sibling_communicator()
         shared_platform_instance = Platform(numerate_amount_of_platforms(), page, generate_URL(), event_bus)
@@ -51,11 +50,43 @@ def home_view(page: Page) -> View:
         platform_tile_container.controls.append(platform_tile.build_card())
         page.update()
 
+        # Change the selected index of the tabs to 0
+        tabs_reference.selected_index = 0
+        tabs_reference.update()
+
     agent_setup_tab = agent_setup.AgentSetupTab(page).build_agent_setup_tab()
     host_config_tab = hosts_tab.HostTab(page).build_hosts_tab()
 
     background_gradient = gradial_background()
-    return View(
+
+    # Create the view and Tabs while assigning a reference
+    tabs_reference = Tabs(
+        selected_index=0,
+        animation_duration=300,
+        tabs=[
+            Tab(
+                text="Platforms",
+                content=Container(  # main view of all the platform tiles
+                    padding=padding.only(left=15, right=0, top=50, bottom=15),
+                    content=Column(
+                        scroll=ScrollMode.AUTO,
+                        controls=[platform_tile_container]
+                    )
+                )
+            ),
+            Tab(
+                text="Agent Setup",
+                content=agent_setup_tab
+            ),
+            Tab(
+                text="Hosts",
+                content=host_config_tab
+            )
+        ],
+        expand=1
+    )
+
+    view = View(
         "/",
         controls=[
             Stack(
@@ -79,37 +110,14 @@ def home_view(page: Page) -> View:
                                     alignment=MainAxisAlignment.SPACE_BETWEEN,
                                 ),
                             ),
-                            Tabs(
-                                selected_index=0,
-                                animation_duration=300,
-                                tabs=[
-                                    Tab(
-                                        text="Platforms",
-                                        content= Container(  # main view of all the platform tiles
-                                            padding=padding.only(left=15, right=0, top=50, bottom=15),
-                                            content=Column(
-                                                scroll=ScrollMode.AUTO,
-                                                controls=[platform_tile_container]
-                                            )
-                                        )
-                                    ),
-                                    Tab(
-                                        text="Agent Setup",
-                                        content=agent_setup_tab
-                                    ),
-                                    Tab(
-                                        text="Hosts",
-                                        content=host_config_tab
-                                    )
-                                ],
-                                expand=1
-                            )
+                            tabs_reference
                         ],
                         expand=True
                     ),
                 ],
-            expand=True
+                expand=True
             )
         ],
         padding=0
     )
+    return view

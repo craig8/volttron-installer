@@ -1,6 +1,6 @@
 from flet import *
 from volttron_installer.modules.validate_field import validate_text
-from volttron_installer.components.platform_components.Platform import Platform
+from volttron_installer.components.platform_components.platform import Platform
 
 class Header:
     def __init__(self, shared_instance, submit_button: OutlinedButton, route: str):

@@ -18,3 +18,6 @@ def build_default_tile(content: any) -> Container:
             alignment=MainAxisAlignment.SPACE_BETWEEN
         )
     )
+
+def build_tile_with_agent_tile(content: Container) -> Container:
+    return

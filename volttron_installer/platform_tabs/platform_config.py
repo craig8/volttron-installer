@@ -1,6 +1,6 @@
 from flet import *
-from volttron_installer.components.platform_components.Platform import Platform
-from volttron_installer.components.Agent import Agent
+from volttron_installer.components.platform_components.platform import Platform
+from volttron_installer.components.agent import Agent
 from volttron_installer.modules.field_methods import field_pair, divide_fields
 
 
@@ -15,7 +15,7 @@ class PlatformConfig:
             host_field,
             agent_config_column
         ) -> None:
-        
+
         #INITIALIZE THE SHARED INSTANCE
         self.platform = shared_instance
 
@@ -23,7 +23,7 @@ class PlatformConfig:
         self.divide_fields = divide_fields
 
         # Name field formation
-        self.name_field = name_field
+        self.name_field: TextField = name_field
         self.name_field.value = self.platform.title  # Set the value of the name field to the title
         self.name_field.on_change = lambda e: self.validate_text(self.name_field)
         
