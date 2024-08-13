@@ -13,7 +13,6 @@ class ConfigTile:
 
     def build_config_tile(self) -> Container:
         config_tile = build_default_tile(self.name)
-
         config_tile.content.controls[1].on_click = self.delete_self
         config_tile.on_click = self.display_content
         return config_tile

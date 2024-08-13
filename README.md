@@ -13,6 +13,18 @@ If using visual studio code, a launch.json file has been created.  Instead of st
 launch the application using the debugger for `launch uvicorn application`.
 
 
+check list 
+[] subscribe every platform to a single object observer instance where additions in the agent setup and hosts will publish
+	a signal and every platform will update their check boxes
+
+[] clicking on an agent in agent config should bring up their agent specific configuration store underneath.
+
+
+issues:
+
+[] when you populate either the hosts or agent setup in the respective global pages in Overview, once you decide
+to take a look at a platform's view and go back to the host or agents page in Overview, their tiles disapear.
+
 <!-- # volttron-installer
 ### Installing Prerequisites
 1. Ensure that Python version 3.10[^1] is installed by running `python3.10 --version`

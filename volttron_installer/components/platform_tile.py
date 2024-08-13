@@ -133,7 +133,6 @@ class PlatformTile:
     def build_card(self) -> Container:
         return self.platform_tile
 
-
     def platform_view(self) -> View:
         # Initializing the header and background
         header = Header(self.platform, self.submit_button, "/").return_header()

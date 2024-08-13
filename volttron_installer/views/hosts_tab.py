@@ -3,6 +3,7 @@ from flet import *
 from volttron_installer.modules.field_methods import field_pair, divide_fields
 from volttron_installer.modules.global_configs import global_hosts, find_dict_index
 from volttron_installer.components.default_tile_styles import build_default_tile
+from volttron_installer.modules.write_to_json import write_to_hosts
 
 @dataclass
 class Host:
@@ -13,15 +14,9 @@ class Host:
     ssh_ip_address: str
     ssh_port: str # string for now
 
-    def remove_self(self, e) -> None:
-        print("yeah hosts_tab.py be aweosme")
-
     def build_host_tile(self) -> Container:
-        # Build host tile
         host_tile = build_default_tile(self.host_id)
-        
-        # Delete button onclick = remove self
-        host_tile.content.controls[1].on_click = self.remove_self
+        #host_tile.content.controls[1].on_click = self.remove_self
         return host_tile
 
 class HostForm:
@@ -50,7 +45,19 @@ class HostForm:
                             self.submit_button,
                         ]
                     )
+        # On initialization, change on click
+        self.host_tile.content.controls[1].on_click = self.remove_self
 
+    def remove_self(self, e) -> None:
+        index = find_dict_index(global_hosts, self.host.host_id)
+        if index is not None:
+            # Removes registered host from global hosts
+            global_hosts.pop(index)  # Use pop(index) to remove by index
+            writting_to_hosts()
+        else:
+            print("The host you are trying to remove hasnt even been properly registered yet.")
+        # method to remove from parent container
+        
 
     def save_host_config(self, e):
         self.host.ssh_sudo_user = self.ssh_sudo_user_field.value
@@ -67,7 +74,7 @@ class HostForm:
         # Now we can change
         self.host.host_id = self.host_id_field.value
 
-        if index is not None:  # Check if index is not None
+        if index is not None:
             # Re-assign new name to agent and update agent details
             global_hosts[index]["host_id"] = self.host.host_id
             global_hosts[index]["ssh_sudo_user"] = self.host.ssh_sudo_user
@@ -84,13 +91,10 @@ class HostForm:
             }
             global_hosts.append(agent_dictionary_appendable)
         self.host_tile.content.controls[0].value = self.host.host_id
-        self.page.update()
         print(global_hosts) # Debug print
         self.host_tile.content.controls[0].value = self.host.host_id
-        self.page.update()
-
-        from volttron_installer.modules.write_to_json import write_to_hosts # writing to a file 
-        write_to_hosts(global_hosts)
+        self.page.update() 
+        writting_to_hosts()
 
     def validate_submit(self, e)-> None:
         if (
@@ -143,7 +147,8 @@ class HostTab:
                 ssh_sudo_user="",
                 identity_file="",
                 ssh_ip_address="",
-                ssh_port=""
+                ssh_port="",
+                
             )
         host_tile = new_host.build_host_tile()
         host_form = HostForm(self.page, new_host, host_tile)
@@ -151,11 +156,12 @@ class HostTab:
         self.list_of_hosts.controls.append(host_tile)
         self.list_of_hosts.update()
 
-
     def host_is_selected(self, e, host_form: HostForm, host_tile: Container) -> None:
         self.host_tab_view.content.controls[2] = host_form.build_host_form()
         self.page.update()
 
-
     def build_hosts_tab(self)-> Container:
         return self.host_tab_view
+
+# Im lazy...
+def writting_to_hosts() -> None : write_to_hosts(global_hosts)

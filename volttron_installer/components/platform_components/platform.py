@@ -14,23 +14,66 @@ own self.functions() or just interpret the data that have been sent from other m
 from flet import Page
 from volttron_installer.modules.global_configs import global_hosts, global_agents
 
-
 class ObjectCommunicator:
-    """An object first subscribes to a specific event_type/signal and inputs their
-own self.process_data function via the subscribe method. Then an object can come along 
-using the publish method to input an event_type/signal to signal all subscribers of that
-signal and pass data into each object's self.process_data
+    """
+    A class for facilitating communication between objects through events or signals.
+
+    This class implements a simple publish-subscribe pattern, allowing objects to subscribe
+    to specific events and receive notifications when those events are published.
+
+    Attributes:
+        _subscribers (dict): A dictionary storing subscribers for each event type.
+            The keys are event types (strings), and the values are lists of callable
+            objects (functions or methods) that will be invoked when the event is published.
+
+    Example Usage:
+
+    ```python
+    # Create an instance of ObjectCommunicator
+    communicator = ObjectCommunicator()
+
+    # Define a subscriber function
+    def process_data(data):
+        print(f"Received data: {data}")
+
+    # Subscribe to the 'my_event' event type
+    communicator.subscribe('my_event', process_data)
+
+    # Publish the 'my_event' event with some data
+    communicator.publish('my_event', "Hello, world!")
+
+    # Output:
+    # Received data: Hello, world!
+    ```
     """
     def __init__(self):
+        """
+        Initializes the ObjectCommunicator with an empty subscribers dictionary.
+        """
         # { signal : [** list of subscribers' process_data() functions **]}
         self._subscribers = {}
 
     def subscribe(self, event_type, subscriber):
+        """
+        Subscribes an object to a specific event type.
+
+        Args:
+            event_type (str): The event type to subscribe to.
+            subscriber (callable): The callable object (function or method) that
+                will be invoked when the event is published.
+        """
         if event_type not in self._subscribers:
             self._subscribers[event_type] = []
         self._subscribers[event_type].append(subscriber)
 
     def publish(self, event_type, data=None):
+        """
+        Publishes an event to all subscribers of that event type.
+
+        Args:
+            event_type (str): The event type to publish.
+            data (any, optional): Data to be passed to the subscribers. Defaults to None.
+        """
         if event_type in self._subscribers:
             for subscriber in self._subscribers[event_type]:
                 subscriber(data)
@@ -61,5 +104,11 @@ class Platform:
         print(f"Platform: I turned activity to: {self.activity}") # Debug print
 
 
-def create_sibling_communicator():
+def create_sibling_communicator() -> ObjectCommunicator:
+    """
+    Im going to be honest there is absolutely no purpose for this, you can just create a single instance 
+    in `home.py` by importing the object and that can facilitate as the central platform event bus lol.
+
+    Args: None
+    """
     return ObjectCommunicator()

@@ -56,7 +56,6 @@ def home_view(page: Page) -> View:
 
     agent_setup_tab = agent_setup.AgentSetupTab(page).build_agent_setup_tab()
     host_config_tab = hosts_tab.HostTab(page).build_hosts_tab()
-
     background_gradient = gradial_background()
 
     # Create the view and Tabs while assigning a reference

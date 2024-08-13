@@ -1,9 +1,11 @@
 from dataclasses import dataclass
 from flet import *
 import json
+from volttron_installer.modules.write_to_json import write_to_agents
 from volttron_installer.modules.field_methods import field_pair, divide_fields
 from volttron_installer.modules.global_configs import global_agents, find_dict_index
 from volttron_installer.components.default_tile_styles import build_default_tile
+from volttron_installer.modules.styles import modal_styles
 
 # this whole file is basically a copy of hosts_tab.py hahahaahahpfioahah aaawawpb
 # ok so when i properly save an agent, its going to publish an event_bus called
@@ -20,10 +22,16 @@ class Agent:
     default_identity: str
     agent_path: str
     agent_configuration: str
-    ssh_port: str # string for now
 
     def remove_self(self, e) -> None:
         print("Yeah, agent_setup.py self.remove works")
+        index = find_dict_index(global_agents, self.agent_name)
+        if index is not None:
+            global_agents.pop(index)
+            writting_to_agents()
+        else:
+            print("agent isnt even properly made")
+        #method to remove from parent container
 
     def build_agent_tile(self) -> Container:
         agent_tile = build_default_tile(self.agent_name)
@@ -36,20 +44,73 @@ class FormTemplate:
         self.agent = agent
         self.agent_tile = host_tile
 
+        # ======================================== Registering modal and stuff==========================
+        self.name_field = TextField(color="black", label="Name", on_change=self.validate_config_entry)
+        self.csv_radio = Radio(value="csv")
+        self.json_radio = Radio(value="json")
+        self.add_config_button = OutlinedButton(
+                                    content=Text("Add", color="black"),
+                                    disabled=True
+                                )
+        self.type_radio_group = RadioGroup(
+            value="",
+            on_change=self.validate_config_entry,
+            content=Row(
+                spacing=25,
+                controls=[
+                    self.radio_title_grouper(self.csv_radio),
+                    self.radio_title_grouper(self.json_radio)
+                ],
+                alignment=MainAxisAlignment.CENTER,
+            )
+        )
+        self.modal_content = Column(
+            spacing=30,
+            horizontal_alignment=CrossAxisAlignment.CENTER,
+            controls=[
+                Text("Add a Configuration", size=20, color="black"),
+                Container(
+                    alignment=alignment.center,
+                    content=self.type_radio_group
+                ),
+                Container(
+                    padding=padding.only(left=20, right=20),
+                    content=self.name_field
+                ),
+                Container(
+                    margin=margin.only(bottom=-20),
+                    padding=padding.only(left=25, right=25),
+                    alignment=alignment.bottom_center,
+                    content=Row(
+                        controls=[
+                            OutlinedButton(on_click=lambda e: self.page.close(self.add_config_modal),
+                                           content=Text("Cancel", color="red")),
+                            self.add_config_button
+                        ],
+                        alignment=MainAxisAlignment.SPACE_BETWEEN
+                    )
+                )
+            ]
+        )
+        self.add_config_modal = AlertDialog(
+            modal=False,
+            bgcolor="#00000000",
+            content=Container(
+                **modal_styles(),
+                width=400,
+                height=250,
+                content=self.modal_content
+            ),
+        )
+
+#=============================================== END OF MODAL STUFF======================================
+
+        # The actual form stuff 
         self.agent_name_field = TextField(on_change=self.validate_submit)
         self.default_identity_field = TextField(on_change=self.validate_submit)
         self.agent_path_field = TextField(on_change=self.validate_submit)
         self.agent_configuration_field = TextField(value="",on_change=self.validate_submit)
-        self.config_store_entry_key = RadioGroup(
-                                        value="",
-                                        on_change=self.validate_submit,
-                                        content=Row(
-                                            controls=[
-                                                Radio(value="csv", label="CSV"),
-                                                Radio(value="json", label="JSON"),
-                                            ]
-                                        )
-                                    )
+        self.config_store_entry_key = OutlinedButton(text="Click Me!", on_click=lambda e: self.page.open(self.add_config_modal))
         self.formatted_fields: list = divide_fields([
                         field_pair("Name", self.agent_name_field),
                         field_pair("Default Identity", self.default_identity_field),
@@ -65,12 +126,31 @@ class FormTemplate:
                             self.submit_button,
                         ]
                     )
+
+    def validate_config_entry(self, e) -> None:
+        if self.name_field.value and self.type_radio_group.value !="":
+            self.add_config_button.disabled = False
+        else:
+            self.add_config_button.disabled = True
+        self.add_config_button.update()
+
+    def radio_title_grouper(self, radio: Radio) -> Row:
+        label = radio.value.upper()
+        return Row(
+            alignment=MainAxisAlignment.CENTER,
+            spacing=-10,
+            controls=[
+                radio,
+                Text(label, color="black")
+            ]
+        )
+
         
     def save_host_config(self, e):
         self.agent.default_identity = self.default_identity_field.value
         self.agent.agent_path = self.agent_path_field.value
         self.agent.agent_configuration = self.agent_configuration_field.value
-        self.agent.ssh_port = self.config_store_entry_key.value
+        #self.agent.ssh_port = self.config_store_entry_key.value
         
         
         # Save old name to variable
@@ -131,7 +211,7 @@ class FormTemplate:
             self.agent_name_field.value and
             self.agent_configuration_field.value and
             self.agent_path_field.value and
-            self.config_store_entry_key.value and
+            #self.config_store_entry_key.value and
             self.default_identity_field.value != "" and
             self.check_json_submit(self.agent_configuration_field) == True
         ):
@@ -176,8 +256,8 @@ class AgentSetupTab:
                 agent_name="New Agent",
                 default_identity="",
                 agent_path="",
-                agent_configuration="",
-                ssh_port=""
+                agent_configuration=""
+                #ssh_port=""
             )
         host_tile = new_host.build_agent_tile()
         host_form = FormTemplate(self.page, new_host, host_tile)
@@ -193,3 +273,6 @@ class AgentSetupTab:
 
     def build_agent_setup_tab(self)-> Container:
         return self.agent_tab_view
+    
+# Im lazy...
+def writting_to_agents() -> None : write_to_agents(global_agents)

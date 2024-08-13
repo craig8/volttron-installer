@@ -18,3 +18,30 @@ def write_to_hosts(data):
 def write_to_agents(data):
     with open(PERSISTENT_AGENTS_FILE, "w") as f:
         json.dump(data, f)
+
+def establish_agents() -> list:
+    """
+    Loads hosts data from the JSON file and returns it as a list.
+
+    Args:
+        None
+
+    Returns:
+        A list of host dictionaries loaded from the JSON file.
+    """
+    with open(PERSISTENT_AGENTS_FILE, "r") as f:
+        return json.load(f)
+
+
+def establish_hosts() -> list:
+    """
+    Loads hosts data from the JSON file and returns it as a list.
+
+    Args:
+        None
+
+    Returns:
+        A list of host dictionaries loaded from the JSON file.
+    """
+    with open(PERSISTENT_HOSTS_FILE, "r") as f:
+        return json.load(f)
