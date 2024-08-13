@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from flet import *
 import json
 from volttron_installer.modules.field_methods import field_pair, divide_fields
-from volttron_installer.modules.global_configs import global_agents
+from volttron_installer.modules.global_configs import global_agents, find_dict_index
 from volttron_installer.components.default_tile_styles import build_default_tile
 
 # this whole file is basically a copy of hosts_tab.py hahahaahahpfioahah aaawawpb
@@ -71,37 +71,42 @@ class FormTemplate:
         self.agent.agent_path = self.agent_path_field.value
         self.agent.agent_configuration = self.agent_configuration_field.value
         self.agent.ssh_port = self.config_store_entry_key.value
+        
+        
         # Save old name to variable
         old_name = self.agent.agent_name
+
+        index = find_dict_index(global_agents, old_name)
+
         # Then re-assign new name
         self.agent.agent_name = self.agent_name_field.value
 
-        if old_name in global_agents.keys():
-            # Re-assign new name to agent
-            global_agents[self.agent.agent_name] = global_agents.pop(old_name)
-            agent_dict = global_agents[self.agent.agent_name]
-
-            # Update agent details
-            agent_dict["default_identity"] = self.agent.default_identity
-            agent_dict["agent_path"] = self.agent.agent_path
-            agent_dict["agent_configuration"] = self.agent.agent_configuration
+        if index is not None:
+            # Re-assign new name to agent and update details
+            global_agents[index]["agent_name"] = self.agent.agent_name
+            global_agents[index]["default_identity"] = self.agent.default_identity
+            global_agents[index]["agent_path"] = self.agent.agent_path
+            global_agents[index]["agent_configuration"] = self.agent.agent_configuration
 
         else:
             agent_dictionary_appendable = {
+                "agent_name" : self.agent.agent_name,
                 "default_identity": self.agent.default_identity,
                 "agent_path": self.agent.agent_path,
                 "agent_configuration": self.agent.agent_configuration,
             }
-            global_agents[self.agent.agent_name] = agent_dictionary_appendable
+            global_agents.append(agent_dictionary_appendable)
 
         self.agent_tile.content.controls[0].value = self.agent.agent_name
         self.page.update()
-        print(global_agents)
+
+        from volttron_installer.modules.write_to_json import write_to_agents # writing to a file 
+        write_to_agents(global_agents)
 
     def check_json_submit(self, field: TextField) -> None:
         # Attempt to parse JSON input
         custom_json = field.value
-        if custom_json == "" :
+        if custom_json == "" : # if custom json config is blank because you could just choose not to have config
             field.border_color = "black"
             field.update()
             return True

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from flet import *
 from volttron_installer.modules.field_methods import field_pair, divide_fields
-from volttron_installer.modules.global_configs import global_hosts
+from volttron_installer.modules.global_configs import global_hosts, find_dict_index
 from volttron_installer.components.default_tile_styles import build_default_tile
 
 @dataclass
@@ -50,7 +50,8 @@ class HostForm:
                             self.submit_button,
                         ]
                     )
-        
+
+
     def save_host_config(self, e):
         self.host.ssh_sudo_user = self.ssh_sudo_user_field.value
         self.host.identity_file = self.identity_file_field.value
@@ -60,35 +61,36 @@ class HostForm:
         # Save the old name of the host for checking purposes
         old_name = self.host.host_id
 
+        # Run find host index function
+        index = find_dict_index(global_hosts, old_name)
+
         # Now we can change
         self.host.host_id = self.host_id_field.value
 
-        if old_name in global_hosts.keys():
-            # Re-assign new name to agent
-            global_hosts[self.host.host_id] = global_hosts.pop(old_name)
-            agent_dict = global_hosts[self.host.host_id]
-
-            # Update agent details
-            agent_dict["ssh_sudo_user"] = self.host.ssh_sudo_user
-            agent_dict["identity_file"] = self.host.identity_file
-            agent_dict["ssh_ip_address"] = self.host.ssh_ip_address
-            agent_dict["ssh_port"] = self.host.ssh_port
-
+        if index is not None:  # Check if index is not None
+            # Re-assign new name to agent and update agent details
+            global_hosts[index]["host_id"] = self.host.host_id
+            global_hosts[index]["ssh_sudo_user"] = self.host.ssh_sudo_user
+            global_hosts[index]["identity_file"] = self.host.identity_file
+            global_hosts[index]["ssh_ip_address"] = self.host.ssh_ip_address
+            global_hosts[index]["ssh_port"] = self.host.ssh_port
         else:
             agent_dictionary_appendable = {
+                "host_id": self.host.host_id,
                 "ssh_sudo_user": self.host.ssh_sudo_user,
                 "identity_file": self.host.identity_file,
                 "ssh_ip_address": self.host.ssh_ip_address,
                 "ssh_port": self.host.ssh_port,
             }
-            global_hosts[self.host.host_id] = agent_dictionary_appendable
-
+            global_hosts.append(agent_dictionary_appendable)
         self.host_tile.content.controls[0].value = self.host.host_id
         self.page.update()
-        print(global_hosts)
+        print(global_hosts) # Debug print
         self.host_tile.content.controls[0].value = self.host.host_id
         self.page.update()
 
+        from volttron_installer.modules.write_to_json import write_to_hosts # writing to a file 
+        write_to_hosts(global_hosts)
 
     def validate_submit(self, e)-> None:
         if (
