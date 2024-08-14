@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from flet import *
 import json
 from volttron_installer.modules.write_to_json import write_to_agents
@@ -6,6 +6,7 @@ from volttron_installer.modules.field_methods import field_pair, divide_fields
 from volttron_installer.modules.global_configs import global_agents, find_dict_index
 from volttron_installer.components.default_tile_styles import build_default_tile
 from volttron_installer.modules.styles import modal_styles
+from volttron_installer.modules.remove_from_controls import remove_from_selection
 
 # this whole file is basically a copy of hosts_tab.py hahahaahahpfioahah aaawawpb
 # ok so when i properly save an agent, its going to publish an event_bus called
@@ -17,34 +18,35 @@ from volttron_installer.modules.styles import modal_styles
 # call event bus on submit -> platform subscribes and so does every dropwdown, everyone updates
 @dataclass
 class Agent:
+    counter = 0
     """Host object, will store nessary info and write to a file"""
     agent_name: str
     default_identity: str
     agent_path: str
     agent_configuration: str
+    id_key : int = field(init=False)
 
-    def remove_self(self, e) -> None:
-        print("Yeah, agent_setup.py self.remove works")
-        index = find_dict_index(global_agents, self.agent_name)
-        if index is not None:
-            global_agents.pop(index)
-            writting_to_agents()
-        else:
-            print("agent isnt even properly made")
-        #method to remove from parent container
+    def __post_init__(self):
+        self.id_key = Agent.counter
+        Agent.counter += 1
 
     def build_agent_tile(self) -> Container:
         agent_tile = build_default_tile(self.agent_name)
-        agent_tile.content.controls[1].on_click = self.remove_self
+        agent_tile.key = self.id_key
         return agent_tile
 
 class FormTemplate:
-    def __init__(self, page: Page, agent: Agent, host_tile: Container):
+    def __init__(self, agent_tab_view, list_of_agents, page: Page, agent: Agent, agent_tile: Container):
         self.page = page
         self.agent = agent
-        self.agent_tile = host_tile
+        self.agent_tile = agent_tile
+        self.agent_tab_view = agent_tab_view
+        self.list_of_agents = list_of_agents
 
-        # ======================================== Registering modal and stuff==========================
+        self.agent_tile.content.controls[1].on_click = self.remove_self
+
+
+# ======================================== Registering modal and stuff==========================
         self.name_field = TextField(color="black", label="Name", on_change=self.validate_config_entry)
         self.csv_radio = Radio(value="csv")
         self.json_radio = Radio(value="json")
@@ -126,6 +128,21 @@ class FormTemplate:
                             self.submit_button,
                         ]
                     )
+        
+    def remove_self(self, e) -> None:
+        index = find_dict_index(global_agents, self.agent.agent_name)
+        if index is not None:
+            # Removes registered host from global hosts
+            global_agents.pop(index)  # Use pop(index) to remove by index
+            writting_to_agents()
+        else:
+            print("The host you are trying to remove hasnt even been properly registered yet.")
+        # method to remove from parent container
+        remove_from_selection(self.list_of_agents, self.agent.id_key)
+        # clear form
+        self.agent_tab_view.content.controls[2] = Column(expand=3)
+        self.page.update()
+
 
     def validate_config_entry(self, e) -> None:
         if self.name_field.value and self.type_radio_group.value !="":
@@ -151,8 +168,6 @@ class FormTemplate:
         self.agent.agent_path = self.agent_path_field.value
         self.agent.agent_configuration = self.agent_configuration_field.value
         #self.agent.ssh_port = self.config_store_entry_key.value
-        
-        
         # Save old name to variable
         old_name = self.agent.agent_name
 
@@ -231,7 +246,7 @@ class AgentSetupTab:
         self.placeholder=Column(
             expand=3
         )
-        self.list_of_hosts = Column(
+        self.list_of_agents = Column(
                                 expand=2,
                                 controls=[
                                     OutlinedButton(text="Setup an Agent", on_click=self.add_new_agent)
@@ -244,7 +259,7 @@ class AgentSetupTab:
                                 border_radius=12,
                                 content=Row(
                                     controls=[
-                                        self.list_of_hosts,
+                                        self.list_of_agents,
                                         VerticalDivider(color="white", width=9, thickness=3),
                                         self.placeholder
                                     ]
@@ -252,24 +267,27 @@ class AgentSetupTab:
                             ) 
 
     def add_new_agent(self, e) -> None:
-        new_host = Agent(
+        new_agent = Agent(
                 agent_name="New Agent",
                 default_identity="",
                 agent_path="",
-                agent_configuration=""
-                #ssh_port=""
+                agent_configuration="",
             )
-        host_tile = new_host.build_agent_tile()
-        host_form = FormTemplate(self.page, new_host, host_tile)
-        host_tile.on_click=lambda e: self.agent_is_selected(e, host_form, host_tile)
-        self.list_of_hosts.controls.append(host_tile)
-        self.list_of_hosts.update()
+        agent_tile = new_agent.build_agent_tile()
+        agent_form = FormTemplate(
+                    self.agent_tab_view,
+                    self.list_of_agents,
+                    self.page,
+                    new_agent,
+                    agent_tile
+                    )
+        agent_tile.on_click=lambda e: self.agent_is_selected(e, agent_form)
+        self.list_of_agents.controls.append(agent_tile)
+        self.list_of_agents.update()
 
-
-    def agent_is_selected(self, e, host_form: FormTemplate, host_tile: Container) -> None:
-        self.agent_tab_view.content.controls[2] = host_form.build_agent_form()
+    def agent_is_selected(self, e, agent_form: FormTemplate) -> None:
+        self.agent_tab_view.content.controls[2] = agent_form.build_agent_form()
         self.page.update()
-
 
     def build_agent_setup_tab(self)-> Container:
         return self.agent_tab_view

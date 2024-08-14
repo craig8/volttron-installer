@@ -81,7 +81,8 @@ class AgentConfig:
     
     # this too
     def add_agent(self, e) -> None:
-        if self.agent_dropdown.value not in self.platform.added_agents:
+        print(self.agent_dropdown.value)
+        if self.agent_dropdown.value not in self.platform.added_agents and self.agent_dropdown.value != None:
             agent_tile_to_add = Agent(self.agent_dropdown.value, self.platform_config_agent_column, self.agent_config_column, self.platform.added_agents)
 
             # Appending to added_agents in the shared instance of Platform

@@ -1,12 +1,14 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from flet import *
 from volttron_installer.modules.field_methods import field_pair, divide_fields
 from volttron_installer.modules.global_configs import global_hosts, find_dict_index
 from volttron_installer.components.default_tile_styles import build_default_tile
 from volttron_installer.modules.write_to_json import write_to_hosts
+from volttron_installer.modules.remove_from_controls import remove_from_selection
 
 @dataclass
 class Host:
+    counter = 0
     """Host object, will store nessary info and write to a file"""
     host_id: str
     ssh_sudo_user: str
@@ -14,16 +16,34 @@ class Host:
     ssh_ip_address: str
     ssh_port: str # string for now
 
+    # For container ID
+    id_key : int = field(init=False)
+
+    def __post_init__(self):
+        self.id_key = Host.counter
+        Host.counter += 1
+        print("current id counter: ", self.id_key)
+
     def build_host_tile(self) -> Container:
         host_tile = build_default_tile(self.host_id)
+        host_tile.key = self.id_key
         #host_tile.content.controls[1].on_click = self.remove_self
         return host_tile
 
 class HostForm:
-    def __init__(self, page: Page, host: Host, host_tile: Container):
+    def __init__(
+            self,
+            page: Page,
+            host: Host,
+            host_tile: Container,
+            list_of_hosts: Column,
+            host_form_view: Container
+            ):
         self.page = page
         self.host = host
         self.host_tile = host_tile
+        self.list_of_hosts = list_of_hosts
+        self.host_form_view = host_form_view
 
         self.host_id_field = TextField(on_change=self.validate_submit)
         self.ssh_sudo_user_field = TextField(on_change=self.validate_submit)
@@ -57,7 +77,10 @@ class HostForm:
         else:
             print("The host you are trying to remove hasnt even been properly registered yet.")
         # method to remove from parent container
-        
+        remove_from_selection(self.list_of_hosts, self.host.id_key)
+        # clear form
+        self.host_form_view.content.controls[2] = Column(expand=3)
+        self.page.update()
 
     def save_host_config(self, e):
         self.host.ssh_sudo_user = self.ssh_sudo_user_field.value
@@ -151,7 +174,13 @@ class HostTab:
                 
             )
         host_tile = new_host.build_host_tile()
-        host_form = HostForm(self.page, new_host, host_tile)
+        host_form = HostForm(
+                    self.page,
+                    new_host,
+                    host_tile,
+                    self.list_of_hosts,
+                    self.host_tab_view
+                    )
         host_tile.on_click=lambda e: self.host_is_selected(e, host_form, host_tile)
         self.list_of_hosts.controls.append(host_tile)
         self.list_of_hosts.update()

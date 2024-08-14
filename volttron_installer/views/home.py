@@ -7,9 +7,6 @@ from typing import Callable
 
 import logging
 
-from volttron_installer.views import hosts_tab
-
-
 _log = logging.getLogger(__name__)
 
 import random
@@ -38,7 +35,7 @@ def numerate_amount_of_platforms() -> str:
 
 def home_view(page: Page) -> View:
     from volttron_installer.views import InstallerViews as vi_views
-    from volttron_installer.views import agent_setup, hosts_tab
+    from volttron_installer.views import agent_setup, hosts_tab, global_config_store
     from volttron_installer.components.platform_tile import platform_tile_container
     from volttron_installer.components.background import gradial_background
     from volttron_installer.components.platform_tile import PlatformTile
@@ -56,6 +53,8 @@ def home_view(page: Page) -> View:
 
     agent_setup_tab = agent_setup.AgentSetupTab(page).build_agent_setup_tab()
     host_config_tab = hosts_tab.HostTab(page).build_hosts_tab()
+    config_store_tab = global_config_store.ConfigStoreManager(page, False).build_store_view()
+
     background_gradient = gradial_background()
 
     # Create the view and Tabs while assigning a reference
@@ -80,6 +79,10 @@ def home_view(page: Page) -> View:
             Tab(
                 text="Hosts",
                 content=host_config_tab
+            ),
+            Tab(
+                text="Config Store Manager",
+                content=config_store_tab
             )
         ],
         expand=1

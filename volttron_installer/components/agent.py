@@ -1,6 +1,7 @@
 from flet import *
 import flet as ft
 import json
+from volttron_installer.modules.remove_from_controls import remove_from_selection
 
 class Agent:
     counter = 0
@@ -104,7 +105,7 @@ class Agent:
             self.platform_agent_container.controls.remove(self.agent_tile)
             self.platform_agent_container.update()
             # Also delete from agent container in agent config
-            self.remove_agent_from_selection()
+            remove_from_selection(self.agent_config_container, self.agent_row.key)
 
     def build_agent_row(self):
         agent_card = self.build_agent_card()
