@@ -36,15 +36,15 @@ The main overview tabs withing the `views` dir, `global_config_store.py`, `agent
 
 ## Developer checklist
 
-[] Have a way to update all UI components with any additions or edits to the `global_hosts`, `global_drivers`, or `global_agents` variables under `/modules/global_configs` | One way I've thought about going about this was to create some sort of observer instance for each of these variables and have each platform subscribe to a signal like "update_global_ui" and once this observer instance sees changes, publishes the "update_global_ui" signal. These signals could all be possible with the `class ObjectCommunicator` in `platform.py` most likely by instantiating one instance of Object Communicator and passing it into the `Platform` object as well as the observer instance object we've been talking about.
+[ ] Have a way to update all UI components with any additions or edits to the `global_hosts`, `global_drivers`, or `global_agents` variables under `/modules/global_configs` | One way I've thought about going about this was to create some sort of observer instance for each of these variables and have each platform subscribe to a signal like "update_global_ui" and once this observer instance sees changes, publishes the "update_global_ui" signal. These signals could all be possible with the `class ObjectCommunicator` in `platform.py` most likely by instantiating one instance of Object Communicator and passing it into the `Platform` object as well as the observer instance object we've been talking about.
 
-[] inside a `PlatformTile` instance, clicking on an agent in agent config should bring up their agent specific configuration store underneath.
+[ ] inside a `PlatformTile` instance, clicking on an agent in agent config should bring up their agent specific configuration store underneath.
 
-[] inside a `PlatformTile` instance, we need to deem what are the suitable requirements for a platform to be deployed and be able to deploy a platform and write that instance to `platforms.json`
+[ ] inside a `PlatformTile` instance, we need to deem what are the suitable requirements for a platform to be deployed and be able to deploy a platform and write that instance to `platforms.json`
 
-[] In the overview page, `config_store_manager` we need to add a text box or something to edit the configuration of a driver.
+[ ] In the overview page, `config_store_manager` we need to add a text box or something to edit the configuration of a driver.
 
-[] In `Agent Setup` tab in overview, when clicking on the modal in the form, we need to have a dropdown with all the available drivers that are registered within the `Config Store Manager`. From there, we can edit the driver to the agent's specific needs. Inside `views/agent_setup.py` and under the `Agent` class, there should be a new attribute like `driver_custom_config` and it should be pretty easy to differentiate whether or not it is a csv or json config. with this config we could write to the agents.json file with its custom driver configs.
+[ ] In `Agent Setup` tab in overview, when clicking on the modal in the form, we need to have a dropdown with all the available drivers that are registered within the `Config Store Manager`. From there, we can edit the driver to the agent's specific needs. Inside `views/agent_setup.py` and under the `Agent` class, there should be a new attribute like `driver_custom_config` and it should be pretty easy to differentiate whether or not it is a csv or json config. with this config we could write to the agents.json file with its custom driver configs.
 
 ## issues
 
