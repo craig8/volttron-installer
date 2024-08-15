@@ -6,52 +6,82 @@ from flet import *
 
 @dataclass
 class ConfigTile:
+    """
+    Dataclass representing a configuration tile that can be displayed and interacted with.
+
+    Attributes:
+        name (str): The name of the configuration.
+        type (str): The type of configuration (e.g., 'csv', 'json').
+        content (str): The content to be displayed when the tile is selected.
+        display_container (Container): The Flet container where the content will be displayed.
+        id_key (int): An auto-incremented identifier key for the tile.
+    """
     counter = 0
-    """Config tile instance"""    
     name: str
     type: str
     content: str
     display_container: Container
-    id_key : int = field(init=False)
+    id_key: int = field(init=False)
 
     def __post_init__(self):
+        """
+        Post-initialization function to set the id_key and increment the counter.
+        """
         self.id_key = ConfigTile.counter
         ConfigTile.counter += 1
 
     def build_config_tile(self) -> Container:
+        """
+        Builds a configuration tile with a click event to display its content.
+
+        Returns:
+            Container: A Flet container representing the tile.
+        """
         config_tile = build_default_tile(self.name)
         config_tile.on_click = self.display_content
         config_tile.key = self.id_key
         return config_tile
 
     def display_content(self, e) -> None:
+        """
+        Event handler to display the content of the configuration tile.
+
+        Args:
+            e: The event object.
+        """
         config_content = Container(
-                            content=Text(value=self.content, size=24)
-                        )
+            content=Text(value=self.content, size=24)
+        )
         self.display_container.content = config_content
         self.display_container.update()
+
 
 from volttron_installer.components.platform_components.platform import Platform
 
 class ConfigStoreManager:
+    """
+    Manages the configuration store interface, allowing users to add and view configurations.
+    Ideally, we'll include a text box for the user so they can edit the driver's configs.
+    
+    Attributes:
+        page (Page): The Flet page where the components are rendered.
+        platform_specific (any): Platform-specific configurations or event handlers.
+    """
     def __init__(self, page: Page, platform_specific: any) -> None:
         self.page = page
-
         self.platform = platform_specific
+
         if isinstance(self.platform, Platform):
             self.platform.event_bus.subscribe("agent_is_selected", self.display_agent_specific)
-        else:
-            # activate function that displays global driver configs 
-            pass
 
         self.name_field = TextField(color="black", label="Name", on_change=self.validate_submit)
         self.csv_radio = Radio(value="csv")
         self.json_radio = Radio(value="json")
         self.add_config_button = OutlinedButton(
-                                    on_click=self.register_new_config,
-                                    content=Text("Add", color="black"),
-                                    disabled=True
-                                )
+            on_click=self.register_new_config,
+            content=Text("Add", color="black"),
+            disabled=True
+        )
         self.type_radio_group = RadioGroup(
             value="",
             on_change=self.validate_submit,
@@ -102,9 +132,9 @@ class ConfigStoreManager:
                 content=self.modal_content
             ),
         )
-        self.config_content_view= Container(
-                                    content=Text("Wow, so much content!")
-                                )
+        self.config_content_view = Container(
+            content=Text("Wow, so much content!")
+        )
         self.store_manager_view = Container(
             height=900,
             padding=padding.only(left=10),
@@ -130,6 +160,15 @@ class ConfigStoreManager:
         )
 
     def radio_title_grouper(self, radio: Radio) -> Row:
+        """
+        Creates a row combining a radio button with its label.
+
+        Args:
+            radio (Radio): The radio button for which to create the label.
+
+        Returns:
+            Row: A row containing the radio button and its label for styling.
+        """
         label = radio.value.upper()
         return Row(
             alignment=MainAxisAlignment.CENTER,
@@ -141,16 +180,32 @@ class ConfigStoreManager:
         )
 
     def display_agent_specific(self):
+        """
+        Placeholder function, will need to think of a way to display agent specific
+        config stores 
+        """
         print("config store manager says wsg w gangalaunche")
 
     def validate_submit(self, e) -> None:
-        if self.name_field.value and self.type_radio_group.value !="":
+        """
+        Validates the form inputs and enables the submit button if valid.
+
+        Args:
+            e: The event object.
+        """
+        if self.name_field.value and self.type_radio_group.value != "":
             self.add_config_button.disabled = False
         else:
             self.add_config_button.disabled = True
         self.add_config_button.update()
 
     def register_new_config(self, e) -> None:
+        """
+        Registers a new configuration and updates the UI to include the new tile.
+
+        Args:
+            e: The event object.
+        """
         new_config = ConfigTile(name=self.name_field.value, type=self.type_radio_group.value, content=f"{self.name_field.value}'s content", display_container=self.config_content_view)
         append_to_container: list = self.store_manager_view.content.controls[0].content.controls
         tile_to_append = new_config.build_config_tile()
@@ -160,9 +215,23 @@ class ConfigStoreManager:
         self.page.close(self.add_config_modal)
         self.store_manager_view.update()
 
+    @staticmethod
     def remove_self(e, container_content, key) -> None:
+        """
+        Removes a configuration tile from the container.
+
+        Args:
+            e: The event object.
+            container_content: The container content to remove the tile from.
+            key: The key of the tile to be removed.
+        """
         remove_from_selection(container_content, key)
 
-
     def build_store_view(self) -> Container:
+        """
+        Builds the main store manager view.
+
+        Returns:
+            Container: The main container for the store manager view.
+        """
         return self.store_manager_view

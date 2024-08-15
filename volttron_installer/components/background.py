@@ -2,6 +2,9 @@ from flet import *
 
 
 def gradial_background() -> Container:
+    """
+    Returns a default background style for consistency
+    """
     return Container(
         expand=True,
         content=Stack(

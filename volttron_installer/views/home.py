@@ -41,9 +41,14 @@ def home_view(page: Page) -> View:
     from volttron_installer.components.platform_tile import PlatformTile
     from volttron_installer.components.platform_components.platform import create_sibling_communicator, Platform
     def add_platform_tile(e) -> None:
+        # Creats a singal isntance of ObjectCommunicator to be used throughout the whole platform
         event_bus = create_sibling_communicator()
+        
+        # Creates a shared platform instance with that same ObjectCommunicator
         shared_platform_instance = Platform(numerate_amount_of_platforms(), page, generate_URL(), event_bus)
         platform_tile = PlatformTile(platform_tile_container, shared_platform_instance)
+        
+        # Add platform tile to container
         platform_tile_container.controls.append(platform_tile.build_card())
         page.update()
 
@@ -51,6 +56,7 @@ def home_view(page: Page) -> View:
         tabs_reference.selected_index = 0
         tabs_reference.update()
 
+    # Initialize tabs
     agent_setup_tab = agent_setup.AgentSetupTab(page).build_agent_setup_tab()
     host_config_tab = hosts_tab.HostTab(page).build_hosts_tab()
     config_store_tab = global_config_store.ConfigStoreManager(page, False).build_store_view()

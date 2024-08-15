@@ -1,3 +1,9 @@
+"""
+SO FAR, A COMPLETELY USELESS FILE BECAUSE I TRIED TO BREAK APART THE 
+OVERVIEW TABS OF `agent_setup.py`, `global_config_store.py`, AND `hosts_tab.py`
+BECAUSE THEY PRACTICALLY ARE JUST COPY AND PASTES OF EACHOTHER AND IT BOTHERS ME
+"""
+
 from dataclasses import dataclass, field
 from flet import *
 from volttron_installer.components.default_tile_styles import build_default_tile

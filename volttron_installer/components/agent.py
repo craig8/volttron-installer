@@ -4,6 +4,10 @@ import json
 from volttron_installer.modules.remove_from_controls import remove_from_selection
 
 class Agent:
+    """
+    A class that manages platform wide agent tiles, views, and handles the custom configuration
+    of the agent.
+    """
     counter = 0
 
     def __init__(self, agent_name, platform_agent_container, agent_config_container, agent_list):

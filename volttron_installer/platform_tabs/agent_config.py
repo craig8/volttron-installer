@@ -15,7 +15,7 @@ class AgentConfig:
         self.platform_config_agent_column: Control = platform_config_column
         self.agent_config_column: Column = agent_config_column
 
-        # Imidiately append necessary components
+        # Immediately append necessary components
         self.agent_dropdown = self.numerate_agent_dropdown()
         self.agent_config_column.controls.append(self.agent_dropdown)
 

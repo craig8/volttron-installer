@@ -144,7 +144,7 @@ class PlatformTile:
         # Override blanket re-styling of text
         self.platform_tile.content.controls[0].controls[1].color = self.get_status_color()
 
-    def build_tile(self):
+    def build_tile(self) -> Container:
         """
         Build the platform tile container.
         """

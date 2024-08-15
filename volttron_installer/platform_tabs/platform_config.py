@@ -22,7 +22,7 @@ class PlatformConfig:
         agent_config_column (Column): Column to hold the agent configuration.
 
         HEADS UP THESE ARE ALL USELESS WE ONLY NEEDED TO PASS THE ``shared_instance`` AND ``agent_config_column``
-        BECAUSE WE CAN JUST ASSIGN OUR OWN 
+        BECAUSE WE CAN JUST ASSIGN OUR OWN TEXT FIELDS ANS SUCH
     """
     def __init__(self,
                  name_field,

@@ -1,3 +1,7 @@
+"""
+Wasted too much time on this but it could work once we actually get to the point of working on it
+"""
+
 from flet import *
 
 from volttron_installer.modules.styles import modal_styles, progress_styles
