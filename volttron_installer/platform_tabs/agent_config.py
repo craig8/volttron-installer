@@ -1,6 +1,7 @@
 from flet import *
 from volttron_installer.components.agent import Agent
 from volttron_installer.components.platform_components.platform import Platform
+from volttron_installer.modules.populate_dropdowns import numerate_agent_dropdown
 
 class AgentConfig:
     def __init__(self, shared_instance: Platform, platform_config_column, agent_config_column) -> None:
@@ -10,13 +11,14 @@ class AgentConfig:
 
         # Subscribe to event
         self.platform.event_bus.subscribe("append_agent_row", self.process_data)
+        self.platform.event_bus.subscribe("update_global_ui", self.update_self_ui)
 
         # Platform agent column and Agent config column
         self.platform_config_agent_column: Control = platform_config_column
         self.agent_config_column: Column = agent_config_column
 
         # Immediately append necessary components
-        self.agent_dropdown = self.numerate_agent_dropdown()
+        self.agent_dropdown = numerate_agent_dropdown()
         self.agent_config_column.controls.append(self.agent_dropdown)
 
         self.add_agent_button =Container(key='DO NOT HURT ME',
@@ -49,6 +51,11 @@ class AgentConfig:
             )
         )
 
+    def update_self_ui(self, data= None):
+        updated_agent_dropdown = numerate_agent_dropdown()
+        self.agent_config_column.controls[0] = updated_agent_dropdown
+        self.platform.page.update()
+
     # helper function to add agent to Agent config view
     def process_data(self, data):
         print("Agent Config received:", data)
@@ -72,14 +79,8 @@ class AgentConfig:
     def display_agent_config_menu(self, agent: Agent, e) -> None:
         self.configure_agent_view.content = agent.build_agent_configuration()
         self.configure_agent_view.update()
-
-    # Not happy with this as it is repeated code from platform_config.py
-    def numerate_agent_dropdown(self) -> Dropdown:
-        from volttron_installer.modules.all_agents import agents
-        dropdown_options = [dropdown.Option(text=agent) for agent in agents()]
-        return Dropdown(options=dropdown_options)
     
-    # this too
+    # repeated code from platform_config.py, Not happy with this. 
     def add_agent(self, e) -> None:
         print(self.agent_dropdown.value)
         if self.agent_dropdown.value not in self.platform.added_agents and self.agent_dropdown.value != None:

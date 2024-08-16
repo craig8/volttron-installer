@@ -24,9 +24,7 @@ class ConfigTile:
     id_key: int = field(init=False)
 
     def __post_init__(self):
-        """
-        Post-initialization function to set the id_key and increment the counter.
-        """
+        """Post-initialization function to set the id_key and increment the counter."""
         self.id_key = ConfigTile.counter
         ConfigTile.counter += 1
 
@@ -67,9 +65,12 @@ class ConfigStoreManager:
         page (Page): The Flet page where the components are rendered.
         platform_specific (any): Platform-specific configurations or event handlers.
     """
-    def __init__(self, page: Page, platform_specific: any) -> None:
+    def __init__(self, page: Page, platform_specific: any, global_event_bus) -> None:
         self.page = page
         self.platform = platform_specific
+
+        # Initialize global event bus
+        self.global_event_bus = global_event_bus
 
         if isinstance(self.platform, Platform):
             self.platform.event_bus.subscribe("agent_is_selected", self.display_agent_specific)
@@ -189,9 +190,6 @@ class ConfigStoreManager:
     def validate_submit(self, e) -> None:
         """
         Validates the form inputs and enables the submit button if valid.
-
-        Args:
-            e: The event object.
         """
         if self.name_field.value and self.type_radio_group.value != "":
             self.add_config_button.disabled = False
@@ -200,32 +198,21 @@ class ConfigStoreManager:
         self.add_config_button.update()
 
     def register_new_config(self, e) -> None:
-        """
-        Registers a new configuration and updates the UI to include the new tile.
-
-        Args:
-            e: The event object.
-        """
+        """Registers a new configuration and updates the UI to include the new tile."""
         new_config = ConfigTile(name=self.name_field.value, type=self.type_radio_group.value, content=f"{self.name_field.value}'s content", display_container=self.config_content_view)
         append_to_container: list = self.store_manager_view.content.controls[0].content.controls
         tile_to_append = new_config.build_config_tile()
-        tile_to_append.content.controls[1].on_click = lambda e: self.remove_self(self.store_manager_view.content.controls[0].content, new_config.id_key)
+        tile_to_append.content.controls[1].on_click = lambda e: self.remove_self(e, self.store_manager_view.content.controls[0].content, new_config.id_key)
         append_to_container.append(tile_to_append)
 
         self.page.close(self.add_config_modal)
         self.store_manager_view.update()
 
-    @staticmethod
-    def remove_self(e, container_content, key) -> None:
-        """
-        Removes a configuration tile from the container.
-
-        Args:
-            e: The event object.
-            container_content: The container content to remove the tile from.
-            key: The key of the tile to be removed.
-        """
+    def remove_self(self, e, container_content, key) -> None:
+        """Removes a configuration tile from the container. And blanks out the content view"""
         remove_from_selection(container_content, key)
+        self.config_content_view.content = Text("Please select a configuration")
+        self.config_content_view.update()
 
     def build_store_view(self) -> Container:
         """

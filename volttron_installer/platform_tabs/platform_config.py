@@ -5,8 +5,9 @@ Module to manage the platform configuration in a platform management application
 from flet import *
 from volttron_installer.components.platform_components.platform import Platform
 from volttron_installer.components.agent import Agent
-from volttron_installer.modules.field_methods import field_pair, divide_fields
+from volttron_installer.modules.create_field_methods import field_pair, divide_fields
 from volttron_installer.modules.global_configs import global_agents, global_hosts
+from volttron_installer.modules.populate_dropdowns import numerate_host_dropdown, numerate_agent_dropdown
 
 
 class PlatformConfig:
@@ -25,9 +26,6 @@ class PlatformConfig:
         BECAUSE WE CAN JUST ASSIGN OUR OWN TEXT FIELDS ANS SUCH
     """
     def __init__(self,
-                 name_field,
-                 addresses_field,
-                 ports_field,
                  shared_instance: Platform,
                  platform_config_agent_column,
                  agent_config_column) -> None:
@@ -44,25 +42,23 @@ class PlatformConfig:
         """
         # Initialize the shared instance
         self.platform = shared_instance
-
-        self.field_pair = field_pair
-        self.divide_fields = divide_fields
+        self.platform.event_bus.subscribe("update_global_ui", self.update_platform_config_ui)
 
         # Name field initialization
-        self.name_field: TextField = name_field
+        self.name_field = TextField(hint_text="Only letters, numbers, and underscores are allowed.")
         self.name_field.value = self.platform.title  # Set the value of the name field to the platform title
         self.name_field.on_change = lambda e: self.validate_text(self.name_field)
         
         # Address field initialization
-        self.addresses_field = addresses_field
-        self.address_field_pair = self.field_pair("Addresses", self.addresses_field)
+        self.addresses_text_field = TextField(label="TCP Address")
+        self.address_field_pair = field_pair("Addresses", self.addresses_text_field)
 
         # Ports field initialization
-        self.ports_field = ports_field
-        self.ports_field_pair = self.field_pair("Ports", self.ports_field)
+        self.ports_field = TextField(value="22916")
+        self.ports_field_pair = field_pair("Ports", self.ports_field)
         
         # Agent dropdown initialization
-        self.agent_dropdown = self.numerate_agent_dropdown()
+        self.agent_dropdown = numerate_agent_dropdown()
         self.agent_dropdown_with_button = Row(
             controls=[
                 Container(expand=3, content=self.agent_dropdown),
@@ -77,20 +73,20 @@ class PlatformConfig:
         self.platform_config_agent_column = platform_config_agent_column
 
         # Host field initialization
-        self.host_field = self.numerate_host_dropdown()
-        self.host_field_pair = self.field_pair("Host", self.host_field)
+        self.host_field = numerate_host_dropdown()
+        self.host_field_pair = field_pair("Host", self.host_field)
         
-        self.bus_field_pair = self.field_pair("Bus Type", Text("Zmq", size=18, color="white"))
+        self.bus_field_pair = field_pair("Bus Type", Text("Zmq", size=18, color="white"))
 
         # Grouping fields for display
         self.almost_fields = [
             self.host_field_pair,
-            self.field_pair("Name", self.name_field),
+            field_pair("Name", self.name_field),
             self.address_field_pair,
             self.ports_field_pair,
             self.bus_field_pair
         ]
-        self.all_fields_formatted = self.divide_fields(self.almost_fields)
+        self.all_fields_formatted = divide_fields(self.almost_fields)
 
         self.comprehensive_view = Container(
             margin=margin.only(left=10, right=10, bottom=5, top=5),
@@ -124,6 +120,13 @@ class PlatformConfig:
                 ]
             )
         )
+    def update_platform_config_ui(self, data=None):
+        self.update_host_dropdown()
+    
+    def update_host_dropdown(self):
+        new_host_field = numerate_host_dropdown()
+        self.host_field_pair.content.controls[1].content = new_host_field  # Update the host field with new host values
+        self.host_field = new_host_field
 
     def validate_text(self, text_field: TextField) -> None:
         """
@@ -141,28 +144,6 @@ class PlatformConfig:
             text_field.error_text = "Only letters, numbers, and underscores are allowed."
             self.platform.event_bus.publish("deploy_button_update", True)
         text_field.update()
-
-    def numerate_agent_dropdown(self) -> Dropdown:
-        """
-        Create a dropdown populated with the available agents.
-
-        Returns:
-            Dropdown: The dropdown with agent options.
-        """
-        from volttron_installer.modules.all_agents import agents
-        dropdown_options = [dropdown.Option(text=agent) for agent in agents()]
-        return Dropdown(options=dropdown_options)
-
-    def numerate_host_dropdown(self) -> Dropdown:
-        """
-        Create a dropdown populated with the hosts that are currently registered.
-
-        Returns:
-            Dropdown: The dropdown with host options.
-        """
-        from volttron_installer.modules.global_configs import global_hosts
-        dropdown_options = [dropdown.Option(text=host["host_id"]) for host in global_hosts]
-        return Dropdown(options=dropdown_options)
 
     def add_agent(self, e) -> None:
         """

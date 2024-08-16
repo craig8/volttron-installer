@@ -12,6 +12,13 @@ _log = logging.getLogger(__name__)
 import random
 import string
 
+
+from volttron_installer.views import agent_setup, hosts_tab, global_config_store
+from volttron_installer.components.platform_tile import platform_tile_container
+from volttron_installer.components.background import gradial_background
+from volttron_installer.components.platform_tile import PlatformTile
+from volttron_installer.components.platform_components.platform import Platform, ObjectCommunicator
+from volttron_installer.modules.global_event_bus import global_event_bus
 # Empty list to keep track of platforms, using this list to avoid duplicate URLs
 platforms_added = []
 
@@ -35,17 +42,13 @@ def numerate_amount_of_platforms() -> str:
 
 def home_view(page: Page) -> View:
     from volttron_installer.views import InstallerViews as vi_views
-    from volttron_installer.views import agent_setup, hosts_tab, global_config_store
-    from volttron_installer.components.platform_tile import platform_tile_container
-    from volttron_installer.components.background import gradial_background
-    from volttron_installer.components.platform_tile import PlatformTile
-    from volttron_installer.components.platform_components.platform import create_sibling_communicator, Platform
+
     def add_platform_tile(e) -> None:
-        # Creats a singal isntance of ObjectCommunicator to be used throughout the whole platform
-        event_bus = create_sibling_communicator()
+        # Creates a single instance of ObjectCommunicator to be used throughout the whole platform
+        event_bus = ObjectCommunicator()
         
         # Creates a shared platform instance with that same ObjectCommunicator
-        shared_platform_instance = Platform(numerate_amount_of_platforms(), page, generate_URL(), event_bus)
+        shared_platform_instance = Platform(numerate_amount_of_platforms(), page, generate_URL(), event_bus, global_event_bus)
         platform_tile = PlatformTile(platform_tile_container, shared_platform_instance)
         
         # Add platform tile to container
@@ -59,7 +62,7 @@ def home_view(page: Page) -> View:
     # Initialize tabs
     agent_setup_tab = agent_setup.AgentSetupTab(page).build_agent_setup_tab()
     host_config_tab = hosts_tab.HostTab(page).build_hosts_tab()
-    config_store_tab = global_config_store.ConfigStoreManager(page, False).build_store_view()
+    config_store_tab = global_config_store.ConfigStoreManager(page, False, global_event_bus).build_store_view()
 
     background_gradient = gradial_background()
 

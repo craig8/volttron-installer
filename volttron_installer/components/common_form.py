@@ -7,7 +7,7 @@ BECAUSE THEY PRACTICALLY ARE JUST COPY AND PASTES OF EACHOTHER AND IT BOTHERS ME
 from dataclasses import dataclass, field
 from flet import *
 from volttron_installer.components.default_tile_styles import build_default_tile
-from volttron_installer.modules.field_methods import field_pair, divide_fields
+from volttron_installer.modules.create_field_methods import field_pair, divide_fields
 from volttron_installer.modules.global_configs import find_dict_index
 from volttron_installer.modules.remove_from_controls import remove_from_selection
 

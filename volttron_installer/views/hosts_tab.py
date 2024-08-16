@@ -1,10 +1,11 @@
 from dataclasses import dataclass, field
 from flet import *
-from volttron_installer.modules.field_methods import field_pair, divide_fields
+from volttron_installer.modules.create_field_methods import field_pair, divide_fields
 from volttron_installer.modules.global_configs import global_hosts, find_dict_index
 from volttron_installer.components.default_tile_styles import build_default_tile
 from volttron_installer.modules.write_to_json import write_to_hosts
 from volttron_installer.modules.remove_from_controls import remove_from_selection
+from volttron_installer.modules.global_event_bus import global_event_bus
 
 @dataclass
 class Host:
@@ -97,6 +98,7 @@ class HostForm:
         remove_from_selection(self.list_of_hosts, self.host.id_key)
         self.host_form_view.content.controls[2] = Column(expand=3)
         self.page.update()
+        update_global_ui()
 
     def save_host_config(self, e):
         """
@@ -131,6 +133,7 @@ class HostForm:
         self.host_tile.content.controls[0].value = self.host.host_id
         self.page.update()
         writting_to_hosts()
+        update_global_ui()
 
     def validate_submit(self, e) -> None:
         """
@@ -232,3 +235,7 @@ class HostTab:
 # Helper function to write the host data to a file
 def writting_to_hosts() -> None:
     write_to_hosts(global_hosts)
+
+@staticmethod
+def update_global_ui():
+    global_event_bus.publish("update_global_ui", None)

@@ -79,7 +79,7 @@ class ObjectCommunicator:
                 subscriber(data)
 
 class Platform:
-    def __init__(self, title: str, page: Page, generated_url: str, event_bus: ObjectCommunicator) -> None:
+    def __init__(self, title: str, page: Page, generated_url: str, event_bus: ObjectCommunicator, global_bus: ObjectCommunicator) -> None:
         self.title = title
         self.page = page
         self.generated_url = generated_url
@@ -91,7 +91,13 @@ class Platform:
         self.added_hosts = {}
         self.added_agents = {} # agent name : [agent object, custom JSON (defaults to False if none)]
         self.activity: str = "OFF"  # OFF by default
-        self.event_bus: ObjectCommunicator = event_bus  # Initialize the Object communicator
+        self.event_bus: ObjectCommunicator = event_bus  # Initialize the Object communicator for all platform components
+        self.global_bus: ObjectCommunicator = global_bus # Initialize global event bus that observes the state of the app
+        self.global_bus.subscribe("update_global_ui", self.update_global_ui)
+
+    def update_global_ui(self, data):
+        # Now we are working downwards and telling every component to update their UI
+        self.event_bus.publish("update_global_ui", None)
 
     def populate_registered_hosts(self) -> dict:
         pass
@@ -102,13 +108,3 @@ class Platform:
     def flip_activity(self) -> None:
         self.activity = "OFF" if self.activity == "ON" else "ON"
         print(f"Platform: I turned activity to: {self.activity}") # Debug print
-
-
-def create_sibling_communicator() -> ObjectCommunicator:
-    """
-    Im going to be honest there is absolutely no purpose for this, you can just create a single instance 
-    in `home.py` by importing the object and that can facilitate as the central platform event bus lol.
-
-    Args: None
-    """
-    return ObjectCommunicator()

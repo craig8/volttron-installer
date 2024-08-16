@@ -38,17 +38,8 @@ class PlatformTile:
         self.home_container = container
         self.platform_tile = self.build_tile()
 
-        # PLATFORM CONFIG SECTION
-        self.name_field = TextField(hint_text="Only letters, numbers, and underscores are allowed.")
-        self.addresses_text_field = TextField(label="TCP Address")
-        self.address_field = Container(content=self.addresses_text_field)
-        self.ports_field = TextField(value="22916")
+        # BUTTON FOR HEADER
         self.submit_button = OutlinedButton("Deploy Platform", disabled=True)
-        self.host_field = Dropdown(
-            options=[
-                dropdown.Option("HOSTEY")
-            ]
-        )
 
         # AGENT COLUMNS 
         self.platform_config_agent_column = Column(wrap=True, scroll=ScrollMode.AUTO)
@@ -61,9 +52,6 @@ class PlatformTile:
 
         # Initialize Platform Config tab
         self.platform_config_tab = PlatformConfig(
-            self.name_field, 
-            self.address_field, 
-            self.ports_field, 
             self.platform, # passing shared instances
             self.platform_config_agent_column,
             self.agent_config_column
@@ -85,7 +73,7 @@ class PlatformTile:
         view = self.platform_view()
         dynamic_routes[self.platform.generated_url] = view
 
-    def update_global_ui(self):
+    def update_global_ui(self, data=None):
         """
         One day this will update everything for now, its lame.
         """
@@ -97,15 +85,6 @@ class PlatformTile:
         """
         print("platformTile received:", data)
         eval(data)
-
-    def submit_fields(self):
-        """
-        Submit and update the platform fields from the user input.
-        """
-        self.platform.title = self.name_field.value
-        self.platform.address = self.addresses_text_field.value
-        self.platform.ports = self.ports_field.value 
-        self.update_platform_tile_ui()
 
     def get_background_color(self):
         """
