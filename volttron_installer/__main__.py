@@ -84,3 +84,9 @@ app.mount(
                      web_renderer=ft.WebRenderer.AUTO,
                      upload_dir=Path(
                          settings.upload_dir).expanduser().as_posix()))
+
+
+if __name__ == '__main__':
+    import uvicorn
+
+    uvicorn.run("volttron_installer.__main__:app")
