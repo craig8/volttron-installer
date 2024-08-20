@@ -21,6 +21,7 @@ class ConfigTile:
     type: str
     content: str
     display_container: Container
+    content_text_control: Text = field(init=False, default=None)
     id_key: int = field(init=False)
 
     def __post_init__(self):
@@ -43,14 +44,29 @@ class ConfigTile:
     def display_content(self, e) -> None:
         """
         Event handler to display the content of the configuration tile.
-
-        Args:
-            e: The event object.
         """
-        config_content = Container(
-            content=Text(value=self.content, size=24)
+        input_field = TextField(label=f"Input custom {self.type}")
+        submit_input = OutlinedButton(text="Submit", on_click=lambda e: self.submit(e, input_field))
+        compy = Row(controls=[input_field, submit_input])
+        
+        # Preserve the reference to the Text control to update it later
+        self.content_text_control = Text(value=self.content, size=24)
+        
+        lol = Column(
+            controls=[
+                compy,
+                self.content_text_control  # Reference to the text control
+            ],
+            spacing=15
         )
-        self.display_container.content = config_content
+        self.display_container.content = lol
+        self.display_container.update()
+    
+    def submit(self, e, input_field):
+        self.content = input_field.value
+        if self.content_text_control:
+            self.content_text_control.value = self.content
+            self.content_text_control.update()
         self.display_container.update()
 
 

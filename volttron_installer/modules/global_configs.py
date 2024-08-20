@@ -15,7 +15,7 @@ An agent name houses all the things for an agent, these dictionaries are formed 
 global agents once an agent is properly set up
 """
 
-from volttron_installer.modules.write_to_json import establish_agents, establish_hosts
+from volttron_installer.modules.write_to_json import establish_agents, establish_hosts, establish_drivers
 
 # Establishing agents.json into global_agents
 global_agents = establish_agents()
@@ -34,6 +34,9 @@ to the new change.
 
 # Establishing agents.json into global_hosts
 global_hosts = establish_hosts()
+
+# Establishing drivers.json into global_drivers
+global_drivers = establish_drivers()
 
 def find_dict_index(lst, name):
     """

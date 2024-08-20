@@ -56,21 +56,41 @@ def home_view(page: Page) -> View:
         page.update()
 
         # Change the selected index of the tabs to 0
-        tabs_reference.selected_index = 0
+        tabs_reference.selected_index = 2
         tabs_reference.update()
+    
+    def tab_change(selected_index):
+        global_event_bus.publish("tab_change", selected_index)
 
     # Initialize tabs
     agent_setup_tab = agent_setup.AgentSetupTab(page).build_agent_setup_tab()
-    host_config_tab = hosts_tab.HostTab(page).build_hosts_tab()
+    host_config_tab = hosts_tab.HostTab(page).build_host_setup_tab()
     config_store_tab = global_config_store.ConfigStoreManager(page, False, global_event_bus).build_store_view()
 
     background_gradient = gradial_background()
+
+    # TESTING PLAYGROUND=========================================================
+    from volttron_installer.views import agency
+
+    test_agent = agency.AgentSetupTab(page).build_agent_setup_tab()
+
+
+    # TESTING PLAYGROUND=========================================================
 
     # Create the view and Tabs while assigning a reference
     tabs_reference = Tabs(
         selected_index=0,
         animation_duration=300,
+        on_change= lambda e: tab_change(e.control.selected_index),
         tabs=[
+            Tab(
+                text="Hosts",
+                content=host_config_tab
+            ),
+            Tab(
+                text="Agent Setup",
+                content=agent_setup_tab
+            ),
             Tab(
                 text="Platforms",
                 content=Container(  # main view of all the platform tiles
@@ -80,14 +100,6 @@ def home_view(page: Page) -> View:
                         controls=[platform_tile_container]
                     )
                 )
-            ),
-            Tab(
-                text="Agent Setup",
-                content=agent_setup_tab
-            ),
-            Tab(
-                text="Hosts",
-                content=host_config_tab
             ),
             Tab(
                 text="Config Store Manager",

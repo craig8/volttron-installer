@@ -92,18 +92,13 @@ class Platform:
         self.added_agents = {} # agent name : [agent object, custom JSON (defaults to False if none)]
         self.activity: str = "OFF"  # OFF by default
         self.event_bus: ObjectCommunicator = event_bus  # Initialize the Object communicator for all platform components
+        
         self.global_bus: ObjectCommunicator = global_bus # Initialize global event bus that observes the state of the app
         self.global_bus.subscribe("update_global_ui", self.update_global_ui)
 
     def update_global_ui(self, data):
         # Now we are working downwards and telling every component to update their UI
         self.event_bus.publish("update_global_ui", None)
-
-    def populate_registered_hosts(self) -> dict:
-        pass
-
-    def populate_added_agents(self) -> dict:
-        pass
 
     def flip_activity(self) -> None:
         self.activity = "OFF" if self.activity == "ON" else "ON"

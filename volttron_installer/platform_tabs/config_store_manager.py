@@ -1,25 +1,32 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from volttron_installer.modules.styles import modal_styles
+from volttron_installer.modules.remove_from_controls import remove_from_selection
 from volttron_installer.components.default_tile_styles import build_default_tile
 from flet import *
 
 @dataclass
 class ConfigTile:
     """Config tile instance"""    
+    counter = 0
+
     name: str
     type: str
     content: str
     display_container: Container
 
+    id_key: int = field(init=False)
+
+    def __post_init__(self):
+        self.id_key = ConfigTile.counter
+        ConfigTile.counter += 1
+
+
     def build_config_tile(self) -> Container:
         config_tile = build_default_tile(self.name)
-        config_tile.content.controls[1].on_click = self.delete_self
         config_tile.on_click = self.display_content
+        config_tile.key = self.id_key
         return config_tile
     
-    def delete_self(self, e):
-        print("ConfigTile: this is just endless suffering please program me to delete myself")
-
     def display_content(self, e) -> None:
         config_content = Container(
                             content=Text(value=self.content, size=24)
@@ -125,6 +132,7 @@ class ConfigStoreManager:
             )
         )
 
+
     def radio_title_grouper(self, radio: Radio) -> Row:
         label = radio.value.upper()
         return Row(
@@ -150,10 +158,15 @@ class ConfigStoreManager:
         new_config = ConfigTile(name=self.name_field.value, type=self.type_radio_group.value, content=f"{self.name_field.value}'s content", display_container=self.config_content_view)
         append_to_container: list = self.store_manager_view.content.controls[0].content.controls
         tile_to_append = new_config.build_config_tile()
+        tile_to_append.on_click = lambda e: self.remove_self(e, self.store_manager_view.content.controls[0].content, tile_to_append.key)
         append_to_container.append(tile_to_append)
 
         self.page.close(self.add_config_modal)
         self.store_manager_view.update()
+
+    # helper function to remove itself from the list of driver configs
+    def remove_self(self, e, control, key):
+        remove_from_selection(control, key)
 
     def build_store_view(self) -> Container:
         return self.store_manager_view

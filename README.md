@@ -36,7 +36,7 @@ The main overview tabs withing the `views` dir, `global_config_store.py`, `agent
 
 ## Developer checklist
 
-- [ ] Have a way to update all UI components with any additions or edits to the `global_hosts`, `global_drivers`, or `global_agents` variables under `/modules/global_configs` | One way I've thought about going about this was to create some sort of observer instance for each of these variables and have each platform subscribe to a signal like "update_global_ui" and once this observer instance sees changes, publishes the "update_global_ui" signal. These signals could all be possible with the `class ObjectCommunicator` in `platform.py` most likely by instantiating one instance of Object Communicator and passing it into the `Platform` object as well as the observer instance object we've been talking about.
+- [x] Have a way to update all UI components with any additions or edits to the `global_hosts`, `global_drivers`, or `global_agents` variables under `/modules/global_configs` | One way I've thought about going about this was to create some sort of observer instance for each of these variables and have each platform subscribe to a signal like "update_global_ui" and once this observer instance sees changes, publishes the "update_global_ui" signal. These signals could all be possible with the `class ObjectCommunicator` in `platform.py` most likely by instantiating one instance of Object Communicator and passing it into the `Platform` object as well as the observer instance object we've been talking about.
 
 - [ ] inside a `PlatformTile` instance, clicking on an agent in agent config should bring up their agent specific configuration store underneath.
 
