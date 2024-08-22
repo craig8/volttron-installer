@@ -1,7 +1,6 @@
 from dataclasses import dataclass, field
 from flet import *
 import json
-from volttron_installer.modules.write_to_json import write_to_agents
 from volttron_installer.modules.create_field_methods import field_pair, divide_fields
 from volttron_installer.modules.global_configs import global_agents, find_dict_index
 from volttron_installer.components.default_tile_styles import build_default_tile

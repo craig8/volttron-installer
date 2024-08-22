@@ -22,6 +22,7 @@ class Agent(BaseTile):
     agent_configuration: str
 
     agent_tile: Container = field(init=False)
+    
     def __post_init__(self):
         super().__init__(self.agent_name)  # Initialize BaseTile with agent_name
         self.agent_tile = self.build_agent_tile()
@@ -46,7 +47,7 @@ class AgentForm(BaseForm):
         super().__init__(page, form_fields)
         self.agent: Agent = agent
         self.json_validity = True
-
+ 
     def validate_fields(self, e) -> None:
         # Implement field validation logic and toggle submit button state.
         fields = [self.form_fields[i] for i in self.form_fields.keys()]
@@ -122,14 +123,9 @@ class AgentSetupTab(BaseTab):
         self.page = page
         self.agent_tab_view = self.tab
 
-        global_event_bus.subscribe("tab_change", self.refresh_tiles)
-    
-        self.page.controls.append(self.list_of_agents)
-        self.page.update()
+        global_event_bus.subscribe("tab_change", self.tab_change)
 
-
-
-    def refresh_tiles(self, selected_tab):
+    def tab_change(self, selected_tab):
         if selected_tab == 1:
             for agent in global_agents:
                 refreshed_agent = Agent(
@@ -139,20 +135,10 @@ class AgentSetupTab(BaseTab):
                                     agent_configuration= agent["agent_configuration"]
                                 )
                 refreshed_form = AgentForm(refreshed_agent, self.page)
-                refreshed_agent.agent_tile.on_click = lambda e: self.show_selected_form(e, refreshed_form)
-                self.list_of_agents.controls.append(refreshed_agent.agent_tile)
-                refreshed_agent.agent_tile.content.controls[1].on_click = lambda e: self.remove_self(global_agents, "agents", {"name": refreshed_agent.agent_name, "id" : refreshed_agent.agent_tile.key})
-            self.list_of_agents.update()
-        
-
+                self.refresh_tiles(global_agents, refreshed_agent, refreshed_agent.agent_tile, refreshed_form, "agents")
 
     def add_new_agent(self, e) -> None:
-        new_agent = Agent(agent_name="New Agent", default_identity="", agent_path="", agent_configuration="")
-        agent_form = AgentForm(new_agent, self.page)
-        new_agent.agent_tile.on_click = lambda e: self.show_selected_form(e, agent_form)
-        self.list_of_agents.controls.append(new_agent.agent_tile)
-        new_agent.agent_tile.content.controls[1].on_click = lambda e: self.remove_self(global_agents, "agents", {"name": new_agent.agent_name, "id" : new_agent.agent_tile.key})
-        self.list_of_agents.update()
+        self.add_new_tile(global_agents, "agents", Agent, AgentForm)
 
     def build_agent_setup_tab(self) -> Container:
         return self.agent_tab_view

@@ -1,6 +1,7 @@
 from volttron_installer.components.base_tile import BaseForm, BaseTab, BaseTile
 from flet import *
 from volttron_installer.modules.global_configs import global_hosts, find_dict_index
+from volttron_installer.modules.global_event_bus import global_event_bus
 from dataclasses import dataclass, field
 import json
 
@@ -85,13 +86,23 @@ class HostTab(BaseTab):
         self.page = page
         self.host_tab_view = self.tab
 
+    #     global_event_bus.subscribe("tab_change", self.tab_change)
+
+    # def tab_change(self, selected_tab):
+    #     if selected_tab == 0:
+    #         for host in global_agents:
+    #             refreshed_agent = Host(
+    #                                 agent_name = host["agent_name"],
+    #                                 default_identity= host["default_identity"],
+    #                                 agent_path= host["agent_path"],
+    #                                 agent_configuration= host["agent_configuration"]
+    #                             )
+    #             refreshed_form = AgentForm(refreshed_agent, self.page)
+    #             self.refresh_tiles(global_agents, refreshed_agent, refreshed_agent.agent_tile, refreshed_form, "agents")
+
+
     def add_new_host(self, e) -> None:
-        new_host = Host(host_id="New Host", ssh_sudo_user="", identity_file="", ssh_ip_address="", ssh_port="")
-        host_form = HostForm(new_host, self.page)
-        new_host.host_tile.on_click = lambda e: self.show_selected_form(e, host_form)
-        self.list_of_hosts.controls.append(new_host.host_tile)
-        new_host.host_tile.content.controls[1].on_click = lambda e: self.remove_self(global_hosts, "hosts", {"name": new_host.host_id, "id" : new_host.host_tile.key})
-        self.list_of_hosts.update()
+        self.add_new_tile(global_hosts, "hosts", Host, HostForm)
 
     def build_host_setup_tab(self) -> Container:
         return self.host_tab_view

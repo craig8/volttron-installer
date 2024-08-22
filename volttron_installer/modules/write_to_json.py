@@ -8,41 +8,30 @@ PERSISTENT_DIR = os.path.join(BASE_DIR, 'persistence_files')
 PERSISTENT_HOSTS_FILE = os.path.join(PERSISTENT_DIR, "hosts.json")
 PERSISTENT_AGENTS_FILE = os.path.join(PERSISTENT_DIR, "agents.json")
 PERSISTENT_DRIVERS_FILE = os.path.join(PERSISTENT_DIR, "drivers.json")
+PERSISTENT_PLATFORM_ID_FILE = os.path.join(PERSISTENT_DIR, "platform_id.json")
 
 # Ensure the directory exists
 os.makedirs(PERSISTENT_DIR, exist_ok=True)
 
-def write_to_file(file: str, global_lst: list) -> None:
-    file_map = {
-        "hosts" or "h" : PERSISTENT_AGENTS_FILE,
-        "agents" or "a": PERSISTENT_AGENTS_FILE,
-        "drivers" or "d": PERSISTENT_DRIVERS_FILE,
-    }
+file_map = {
+    "hosts" or "h" : PERSISTENT_AGENTS_FILE,
+    "agents" or "a": PERSISTENT_AGENTS_FILE,
+    "drivers" or "d": PERSISTENT_DRIVERS_FILE,
+    "platform_id" or "pID": PERSISTENT_PLATFORM_ID_FILE,
+}
+
+def write_to_file(file: str, var: any) -> None:
+    """
+    Takes a variable, typically a `list`, then dumps that into a persistent
+    JSON file that the app will read and right from.
+
+    list of file names:
+    hosts, agents, drivers, platform_id
+    """
     with open(file_map[file], "w") as f:
-        json.dump(global_lst, f)
+        json.dump(var, f)
 
-
-def write_to_hosts(data):
-    with open(PERSISTENT_HOSTS_FILE, "w") as f:
-        json.dump(data, f)
-
-def write_to_agents(data):
-    with open(PERSISTENT_AGENTS_FILE, "w") as f:
-        json.dump(data, f)
-
-
-
-def establish_agents() -> list:
-    """Loads agents data from the JSON file and returns it as a list."""
-    with open(PERSISTENT_AGENTS_FILE, "r") as f:
-        return json.load(f)
-
-
-def establish_hosts() -> list:
-    """Loads hosts data from the JSON file and returns it as a list."""
-    with open(PERSISTENT_HOSTS_FILE, "r") as f:
-        return json.load(f)
-
-def establish_drivers() -> list:
-    with open(PERSISTENT_DRIVERS_FILE, "r") as f:
+def dump_to_var(file: str) -> any:
+    """Takes file name and returns corresponding JSON dump"""
+    with open(file_map[file], "r") as f:
         return json.load(f)

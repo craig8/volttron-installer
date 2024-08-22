@@ -13,14 +13,7 @@ global agents = [
 
 An agent name houses all the things for an agent, these dictionaries are formed and appended
 global agents once an agent is properly set up
-"""
 
-from volttron_installer.modules.write_to_json import establish_agents, establish_hosts, establish_drivers
-
-# Establishing agents.json into global_agents
-global_agents = establish_agents()
-
-"""
 NOTE:
 When registering a platform under a host, the platform will execute their own function
 appending themselves to the host, the function will have to grab the index of the host
@@ -30,13 +23,19 @@ global_hosts[index][platform_uid] = self
 
 this will call the event listener in the platform which will tell all objects to update their ui
 to the new change.
+
 """
 
+from volttron_installer.modules.write_to_json import dump_to_var
+
+# Establishing agents.json into global_agents
+global_agents = dump_to_var("agents")
+
 # Establishing agents.json into global_hosts
-global_hosts = establish_hosts()
+global_hosts = dump_to_var("hosts")
 
 # Establishing drivers.json into global_drivers
-global_drivers = establish_drivers()
+global_drivers = dump_to_var("drivers")
 
 def find_dict_index(lst, name):
     """
