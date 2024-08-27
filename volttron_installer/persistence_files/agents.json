@@ -1,1 +1,1 @@
-[{"agent_name": "Listener", "default_identity": "Listener.agent", "agent_path": "/home/volttron/examples/ListenerAgent", "agent_configuration": "{\"log-level\" : \"INFO\"}"}, {"host_id": "i", "ssh_sudo_user": "aa", "identity_file": "aa", "ssh_ip_address": "aa", "ssh_port": "a"}]
+[{"agent_name": "configued", "default_identity": "f", "agent_path": "h", "agent_configuration": "{\"A\":\"A\"}"}]

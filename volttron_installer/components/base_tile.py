@@ -8,12 +8,12 @@ from flet import *
 from dataclasses import fields
 
 class BaseTile:
-    counter = dump_to_var("platform_id")
+    counter = dump_to_var("tile_id")
 
     def __init__(self, title: str):
         self.title = title
         BaseTile.counter += 1
-        write_to_file("platform_id", BaseTile.counter)
+        write_to_file("tile_id", BaseTile.counter)
 
     def build_tile(self) -> Container:
         tile = build_default_tile(self.title)
@@ -33,10 +33,18 @@ class BaseForm:
         self.page = page
         self.form_fields = form_fields
         self.val_constructor = []
-        try:
-            self.val_constructor: list= [form_fields[i] for i in form_fields.keys()]
-        except:
-            raise ValueError("base_tile reads form fields as unhashable")
+        self.non_fields = []
+        self.additional_content = Container() #blank ahh container
+        for key, field in self.form_fields.items():
+            if isinstance(field, Container):
+                field = Container(content=Text("COMPYYYY"))
+                self.additional_content = field
+            else:
+                if isinstance(field, TextField):
+                    self.val_constructor.append(field)
+                else:
+                    self.non_fields.append(field)
+
         self.submit_button = OutlinedButton(text="Save", disabled=True, on_click=self.save_config)
         self.formatted_fields: any = self.create_fields()
         self._form = Column(
@@ -44,16 +52,30 @@ class BaseForm:
             controls=[
                 *self.formatted_fields,
                 self.submit_button,
+                self.additional_content
             ]
         )
-
+    
+    def refresh_form(self, instance: object) -> None:
+        """Post init, will refresh form values"""
+        instance_fields = fields(instance)
+        instance_values = [getattr(instance, field_object.name) for field_object in instance_fields]
+        for i, attribute in zip(self.val_constructor, instance_values):
+            if isinstance(i, TextField):
+                i.value = attribute
+        self.page.update()
 
     def create_fields(self) -> list:
         """Pairs fields up with title then returns divided up field pairs"""
         field_pairs = []
         try:
-            for i in self.form_fields.keys():
-                field_pairs.append(field_pair(i, self.form_fields[i]))
+            for obj, key in zip(self.val_constructor, self.form_fields.keys()):
+                if obj == self.form_fields[key]:
+                    field_pairs.append(field_pair(key, self.form_fields[key]))
+
+            for i in list(self.form_fields.keys()):
+                if self.form_fields[i] in self.non_fields:
+                    field_pairs.append(field_pair(i, self.form_fields[i]))
             return divide_fields(field_pairs)
         except:
             print("form_fields contains unhashable kwargs")
@@ -102,19 +124,37 @@ class BaseTab:
         )
         return tab_view
     
-    def refresh_tiles(self, global_list, instance: BaseTile, instance_tile: Container, instance_form: BaseForm, file_name: str):
+    def refresh_tiles(self, file_name: str, global_list: list, instance_cls: object, instance_form_cls: object):
         if self.contains_container() == False:
-            instance_tile.on_click = lambda e: self.show_selected_form(e, instance_form)
-            self.instance_tile_column.controls.append(instance_tile)
-            instance_tile.content.controls[1].on_click = lambda e: self.remove_self(global_list, file_name, {"name" : instance.list_attributes()[0], "id" : instance_tile.key})
-            self.instance_tile_column.update()
+            for item in global_list:
+                instance_cls_field = fields(instance_cls)
+                instance_cls_attributes = [attribute.name for attribute in instance_cls_field]
+                instance_constructor = {}
+                for attribute, key in zip(item, instance_cls_attributes):
+                    instance_constructor[key] = item[key]
+    
+                # Create instance with our constructor
+                instance = instance_cls(**instance_constructor)
+                
+                # Create a new field out of our new instance, extract instance_tile
+                instance_fields = fields(instance)
+                instance_values = [getattr(instance, field_object.name) for field_object in instance_fields]
+                instance_tile: Container = instance_values[-1]
+
+                # Create form with our new instance
+                form: BaseForm = instance_form_cls(instance, self.page)
+
+                self.configure_new_instance(file_name, global_list, instance_values, instance_tile, form, instance)
 
     def add_new_tile(self, global_list, file_name: str, object: BaseTile, form: BaseForm):
         field_objects = fields(object)
         attributes = [field_object.name for field_object in field_objects]
         object_constructor = {}
-        for attribute in attributes[:-1]:
-            object_constructor[attribute] = ""
+        for i, attribute in enumerate(attributes[:-1]):
+            if i == 0:
+                object_constructor[attribute] = "Configure Me!"
+            else:
+                object_constructor[attribute] = ""
         new_instance: BaseTile = object(**object_constructor)
         new_form = form(new_instance, self.page)
 
@@ -122,10 +162,14 @@ class BaseTab:
         new_instance_values = [getattr(new_instance, field_object.name) for field_object in new_instance_fields]
         new_tile: Container = new_instance_values[-1]
 
-        new_tile.on_click = lambda e: self.show_selected_form(e, new_form)
-        new_tile.content.controls[1].on_click = lambda e: self.remove_self(global_list, file_name, {"name": new_instance_values[0], "id" : new_tile.key})
-        self.instance_tile_column.controls.append(new_tile)
+        self.configure_new_instance(file_name, global_list, new_instance_values, new_tile, new_form, new_instance)
+
+    def configure_new_instance(self, file_name: str, global_list: list, instance_values, tile: Container, form: BaseForm, instance):
+        tile.on_click =lambda e: self.show_selected_form(e, form)
+        tile.content.controls[1].on_click = lambda e: self.remove_self(global_list, file_name, {"name" : instance_values[0], "id" : tile.key})
+        self.instance_tile_column.controls.append(tile)
         self.instance_tile_column.update()
+        form.refresh_form(instance)
 
     def contains_container(self):
         """Just checks if there is a container in the instance_tile_column"""

@@ -65,17 +65,9 @@ def home_view(page: Page) -> View:
     # Initialize tabs
     agent_setup_tab = agent_setup.AgentSetupTab(page).build_agent_setup_tab()
     host_config_tab = hosts_tab.HostTab(page).build_host_setup_tab()
-    config_store_tab = global_config_store.ConfigStoreManager(page, False, global_event_bus).build_store_view()
+    config_store_tab = global_config_store.ConfigStoreManagerTab(page).build_config_store_tab()
 
     background_gradient = gradial_background()
-
-    # TESTING PLAYGROUND=========================================================
-    from volttron_installer.views import agency
-
-    test_agent = agency.AgentSetupTab(page).build_agent_setup_tab()
-
-
-    # TESTING PLAYGROUND=========================================================
 
     # Create the view and Tabs while assigning a reference
     tabs_reference = Tabs(
@@ -144,3 +136,6 @@ def home_view(page: Page) -> View:
         padding=0
     )
     return view
+
+
+global_event_bus.publish("tab_change", None)

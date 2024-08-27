@@ -1,3 +1,9 @@
 [
-
+    {
+        "host_id": "hostey",
+        "ssh_sudo_user": "VOLTTRON",
+        "identity_file": "a",
+        "ssh_ip_address": "a",
+        "ssh_port": "a"
+    }
 ]

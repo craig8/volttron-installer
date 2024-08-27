@@ -2,10 +2,10 @@ from volttron_installer.components.base_tile import BaseForm, BaseTab, BaseTile
 from flet import *
 from volttron_installer.modules.global_configs import global_agents, find_dict_index
 from volttron_installer.modules.global_event_bus import global_event_bus
+from volttron_installer.modules.styles import modal_styles
 from dataclasses import dataclass, field
+from volttron_installer.modules.populate_dropdowns import numerate_configs_dropdown
 import json
-
-from volttron_installer.platform_tabs.agent_config import AgentConfig
 
 key_constructor =[
     "agent_name",
@@ -21,11 +21,11 @@ class Agent(BaseTile):
     agent_path: str
     agent_configuration: str
 
-    agent_tile: Container = field(init=False)
+    tile: Container = field(init=False)
     
     def __post_init__(self):
         super().__init__(self.agent_name)  # Initialize BaseTile with agent_name
-        self.agent_tile = self.build_agent_tile()
+        self.tile = self.build_agent_tile()
 
     def build_agent_tile(self) -> Container:
         return self.build_tile()  # Calls BaseTile's build_tile method
@@ -36,21 +36,86 @@ class AgentForm(BaseForm):
         self.agent_name_field = TextField(on_change=self.validate_fields)
         self.default_identity_field = TextField(on_change=self.validate_fields)
         self.agent_path_field = TextField(on_change=self.validate_fields)
-        self.agent_configuration_field = TextField(on_change=lambda e: self.check_json_submit(e, self.agent_configuration_field))
+        self.agent_configuration_field = TextField(on_change=lambda e: self.check_json_field(e, self.agent_configuration_field))
+        
+        global_event_bus.subscribe("update_global_ui", self.update_ui)
+
+        self.config_dropdown = numerate_configs_dropdown()
+        self.config_dropdown.border_color= "black"
+        self.config_dropdown.color="black"
+        self.save_config_store_entry_button=OutlinedButton(
+                                                text="_____",
+                                                content=Text("Save", color="black")
+                                            )
+        self.modal_content = Column(
+                        horizontal_alignment=CrossAxisAlignment.CENTER,
+                        controls=[
+                            Text("Edit Store Entries", size=20, color="black"),
+                            Row(
+                                spacing = 10,
+                                controls=[
+                                    self.config_dropdown,
+                                    Container()
+                                ]
+                            ),
+                            Container(
+                                margin=margin.only(bottom=-20),
+                                padding=padding.only(left=25, right=25),
+                                alignment=alignment.bottom_center,
+                                content=Row(
+                                    controls=[
+                                        OutlinedButton(on_click=lambda e: self.page.close(self.modal),
+                                                    content=Text("Cancel", color="red")),
+                                        self.save_config_store_entry_button
+                                    ],
+                                    alignment=MainAxisAlignment.SPACE_BETWEEN
+                                )
+                            )
+                        ]
+                    )
+        self.modal = AlertDialog(
+                        modal = False,
+                        bgcolor="#00000000",
+                        content=Container(
+                            **modal_styles(),
+                            width=400,
+                            height=250,
+                            content=self.modal_content
+                        )
+                    )
+
         form_fields = {
             "Name" : self.agent_name_field,
             "Default Identity" : self.default_identity_field,
             "Agent Path" : self.agent_path_field,
             "Agent Configuration" : self.agent_configuration_field,
+            "Config Store Entries" : OutlinedButton(text="Edit", on_click=lambda e: self.page.open(self.modal))
         }
 
         super().__init__(page, form_fields)
         self.agent: Agent = agent
         self.json_validity = True
+        self.added_config_store_entries = None
  
+    """
+    self.added_config_store_entries = [
+                                        {name:type}
+                                      ]
+    a = {'configs : [
+                        {name: type},
+                        {name:type}
+                    ]
+        }
+    """
+
+    def update_ui(self, var = None)-> None:
+        print("agent_setup.py has received `update_global_ui`")
+        self.config_dropdown = numerate_configs_dropdown()
+        self.config_dropdown.update()
+
     def validate_fields(self, e) -> None:
         # Implement field validation logic and toggle submit button state.
-        fields = [self.form_fields[i] for i in self.form_fields.keys()]
+        fields = [self.form_fields[i] for i in self.form_fields.keys() if isinstance(self.form_fields[i], TextField)]
         valid = all(field.value for field in fields)
         if self.json_validity == False:
             self.toggle_submit_button(False)
@@ -79,14 +144,12 @@ class AgentForm(BaseForm):
                 agent_dictionary_appendable[key] = val.value
             global_agents.append(agent_dictionary_appendable)
 
-        self.agent.agent_tile.content.controls[0].value = self.agent.agent_name
+        self.agent.tile.content.controls[0].value = self.agent.agent_name
         self.page.update()
         self.write_to_file("agents", global_agents)
         update_global_ui()
 
-
-
-    def check_json_submit(self, e, field: TextField) -> None:
+    def check_json_field(self, e, field: TextField) -> None:
         """
         Validates the JSON input in a text field.
 
@@ -126,16 +189,7 @@ class AgentSetupTab(BaseTab):
         global_event_bus.subscribe("tab_change", self.tab_change)
 
     def tab_change(self, selected_tab):
-        if selected_tab == 1:
-            for agent in global_agents:
-                refreshed_agent = Agent(
-                                    agent_name = agent["agent_name"],
-                                    default_identity= agent["default_identity"],
-                                    agent_path= agent["agent_path"],
-                                    agent_configuration= agent["agent_configuration"]
-                                )
-                refreshed_form = AgentForm(refreshed_agent, self.page)
-                self.refresh_tiles(global_agents, refreshed_agent, refreshed_agent.agent_tile, refreshed_form, "agents")
+        self.refresh_tiles("agents", global_agents, Agent, AgentForm)
 
     def add_new_agent(self, e) -> None:
         self.add_new_tile(global_agents, "agents", Agent, AgentForm)

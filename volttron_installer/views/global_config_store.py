@@ -1,240 +1,133 @@
-from dataclasses import dataclass, field
-from volttron_installer.modules.styles import modal_styles
-from volttron_installer.modules.remove_from_controls import remove_from_selection
-from volttron_installer.components.default_tile_styles import build_default_tile
+from volttron_installer.components.base_tile import BaseForm, BaseTab, BaseTile
 from flet import *
+from volttron_installer.modules.global_configs import global_drivers, find_dict_index
+from volttron_installer.modules.validate_field import check_csv_field, check_json_field
+from volttron_installer.modules.global_event_bus import global_event_bus
+from dataclasses import dataclass, field
+import json
+
+# Constants
+key_constructor = [
+    "name",
+    "content",
+    "type",
+]
 
 @dataclass
-class ConfigTile:
-    """
-    Dataclass representing a configuration tile that can be displayed and interacted with.
-
-    Attributes:
-        name (str): The name of the configuration.
-        type (str): The type of configuration (e.g., 'csv', 'json').
-        content (str): The content to be displayed when the tile is selected.
-        display_container (Container): The Flet container where the content will be displayed.
-        id_key (int): An auto-incremented identifier key for the tile.
-    """
-    counter = 0
+class Config(BaseTile):
     name: str
-    type: str
     content: str
-    display_container: Container
-    content_text_control: Text = field(init=False, default=None)
-    id_key: int = field(init=False)
+    type: str  # CSV or JSON
+
+    tile: Container = field(init=False)
 
     def __post_init__(self):
-        """Post-initialization function to set the id_key and increment the counter."""
-        self.id_key = ConfigTile.counter
-        ConfigTile.counter += 1
+        super().__init__(self.name)  # Initialize BaseTile with name
+        self.tile = self.build_config_tile()
 
     def build_config_tile(self) -> Container:
-        """
-        Builds a configuration tile with a click event to display its content.
+        return self.build_tile()  # Calls BaseTile's build_tile method
 
-        Returns:
-            Container: A Flet container representing the tile.
-        """
-        config_tile = build_default_tile(self.name)
-        config_tile.on_click = self.display_content
-        config_tile.key = self.id_key
-        return config_tile
-
-    def display_content(self, e) -> None:
-        """
-        Event handler to display the content of the configuration tile.
-        """
-        input_field = TextField(label=f"Input custom {self.type}")
-        submit_input = OutlinedButton(text="Submit", on_click=lambda e: self.submit(e, input_field))
-        compy = Row(controls=[input_field, submit_input])
-        
-        # Preserve the reference to the Text control to update it later
-        self.content_text_control = Text(value=self.content, size=24)
-        
-        lol = Column(
-            controls=[
-                compy,
-                self.content_text_control  # Reference to the text control
-            ],
-            spacing=15
-        )
-        self.display_container.content = lol
-        self.display_container.update()
-    
-    def submit(self, e, input_field):
-        self.content = input_field.value
-        if self.content_text_control:
-            self.content_text_control.value = self.content
-            self.content_text_control.update()
-        self.display_container.update()
-
-
-from volttron_installer.components.platform_components.platform import Platform
-
-class ConfigStoreManager:
-    """
-    Manages the configuration store interface, allowing users to add and view configurations.
-    Ideally, we'll include a text box for the user so they can edit the driver's configs.
-    
-    Attributes:
-        page (Page): The Flet page where the components are rendered.
-        platform_specific (any): Platform-specific configurations or event handlers.
-    """
-    def __init__(self, page: Page, platform_specific: any, global_event_bus) -> None:
-        self.page = page
-        self.platform = platform_specific
-
-        # Initialize global event bus
-        self.global_event_bus = global_event_bus
-
-        if isinstance(self.platform, Platform):
-            self.platform.event_bus.subscribe("agent_is_selected", self.display_agent_specific)
-
-        self.name_field = TextField(color="black", label="Name", on_change=self.validate_submit)
-        self.csv_radio = Radio(value="csv")
-        self.json_radio = Radio(value="json")
-        self.add_config_button = OutlinedButton(
-            on_click=self.register_new_config,
-            content=Text("Add", color="black"),
-            disabled=True
-        )
+class ConfigForm(BaseForm):
+    def __init__(self, config, page: Page):
+        self.name_field = TextField(on_change=self.validate_fields)
         self.type_radio_group = RadioGroup(
             value="",
-            on_change=self.validate_submit,
+            on_change=self.type_change,
             content=Row(
                 spacing=25,
                 controls=[
-                    self.radio_title_grouper(self.csv_radio),
-                    self.radio_title_grouper(self.json_radio)
-                ],
-                alignment=MainAxisAlignment.CENTER,
-            )
-        )
-        self.modal_content = Column(
-            spacing=30,
-            horizontal_alignment=CrossAxisAlignment.CENTER,
-            controls=[
-                Text("Add a Configuration", size=20, color="black"),
-                Container(
-                    alignment=alignment.center,
-                    content=self.type_radio_group
-                ),
-                Container(
-                    padding=padding.only(left=20, right=20),
-                    content=self.name_field
-                ),
-                Container(
-                    margin=margin.only(bottom=-20),
-                    padding=padding.only(left=25, right=25),
-                    alignment=alignment.bottom_center,
-                    content=Row(
-                        controls=[
-                            OutlinedButton(on_click=lambda e: self.page.close(self.add_config_modal),
-                                           content=Text("Cancel", color="red")),
-                            self.add_config_button
-                        ],
-                        alignment=MainAxisAlignment.SPACE_BETWEEN
-                    )
-                )
-            ]
-        )
-        self.add_config_modal = AlertDialog(
-            modal=False,
-            bgcolor="#00000000",
-            content=Container(
-                **modal_styles(),
-                width=400,
-                height=250,
-                content=self.modal_content
-            ),
-        )
-        self.config_content_view = Container(
-            content=Text("Wow, so much content!")
-        )
-        self.store_manager_view = Container(
-            height=900,
-            padding=padding.only(left=10),
-            margin=margin.only(left=10, right=10, bottom=5, top=5),
-            bgcolor="#20f4f4f4",
-            border_radius=12,
-            content=Row(
-                controls=[
-                    Container(
-                        content=Column(
-                            controls=[
-                                OutlinedButton(
-                                    text="Add a Configuration",
-                                    on_click=lambda e: self.page.open(self.add_config_modal)
-                                ),
-                            ]
-                        )
-                    ),
-                    VerticalDivider(color="white", width=9, thickness=3),
-                    self.config_content_view
+                    Radio(label="JSON", value="JSON"),
+                    Radio(label="CSV", value="CSV")
                 ]
             )
         )
+        self.content_field = TextField(on_change=self.validate_fields)
 
-    def radio_title_grouper(self, radio: Radio) -> Row:
-        """
-        Creates a row combining a radio button with its label.
+        form_fields = {
+            "Name": self.name_field,
+            "Content": self.content_field,
+            "Type": self.type_radio_group,
+        }
 
-        Args:
-            radio (Radio): The radio button for which to create the label.
+        super().__init__(page, form_fields)
+        self.config: Config = config
+        self.config_mode = None
+        self.content_field_validity = False
+        self.submit = False
 
-        Returns:
-            Row: A row containing the radio button and its label for styling.
-        """
-        label = radio.value.upper()
-        return Row(
-            alignment=MainAxisAlignment.CENTER,
-            spacing=-10,
+    def validate_fields(self, e) -> None:
+        fields = [self.form_fields[i].value for i in self.form_fields.keys() if i != "Type"]
+        all_fields_valid = all(fields)
+
+        content_valid = self.correct_input() is not False
+
+        if all_fields_valid and content_valid and self.submit:
+            self.toggle_submit_button(True)  # Enable button if all fields are valid
+        else:
+            self.toggle_submit_button(False)  # Disable button if any field is not valid
+
+    def correct_input(self) -> bool:
+        if self.config_mode == "CSV":
+            return check_csv_field(self.content_field)
+        elif self.config_mode == "JSON":
+            return check_json_field(self.content_field)
+        else:
+            print("You need to select your type of field")
+
+    def type_change(self, e):
+        self.config_mode = e.control.value
+        self.submit = True
+        self.validate_fields(e)
+
+    def save_config(self, e) -> None:
+        # Update the config object with current values from the fields
+        self.config.name = self.name_field.value
+        self.config.type = self.type_radio_group.value
+        self.config.content = self.content_field.value
+
+        old_name = self.config.name
+        index = find_dict_index(global_drivers, old_name)
+
+        config_dictionary_appendable = {
+            "name": self.config.name,
+            "type": self.config.type,
+            "content": self.config.content,
+        }
+
+        # If an existing entry already exists
+        if index is not None:
+            # Update the existing entry
+            global_drivers[index] = config_dictionary_appendable
+        else:
+            # Add a new entry
+            global_drivers.append(config_dictionary_appendable)
+
+        # Update the UI tile content
+        self.config.tile.content.controls[0].value = self.config.name
+        self.page.update()
+        
+        # Write the changes to file
+        self.write_to_file("drivers", global_drivers)
+
+class ConfigStoreManagerTab(BaseTab):
+    def __init__(self, page: Page) -> None:
+        self.list_of_configs = Column(
+            expand=2,
             controls=[
-                radio,
-                Text(label, color="black")
+                OutlinedButton(text="Setup a Config", on_click=self.add_new_config)
             ]
         )
 
-    def display_agent_specific(self):
-        """
-        Placeholder function, will need to think of a way to display agent specific
-        config stores 
-        """
-        print("config store manager says wsg w gangalaunche")
+        super().__init__(self.list_of_configs, page)
+        self.page = page
+        global_event_bus.subscribe("tab_change", self.tab_change)
 
-    def validate_submit(self, e) -> None:
-        """
-        Validates the form inputs and enables the submit button if valid.
-        """
-        if self.name_field.value and self.type_radio_group.value != "":
-            self.add_config_button.disabled = False
-        else:
-            self.add_config_button.disabled = True
-        self.add_config_button.update()
+    def add_new_config(self, e) -> None:
+        self.add_new_tile(global_drivers, "drivers", Config, ConfigForm)
 
-    def register_new_config(self, e) -> None:
-        """Registers a new configuration and updates the UI to include the new tile."""
-        new_config = ConfigTile(name=self.name_field.value, type=self.type_radio_group.value, content=f"{self.name_field.value}'s content", display_container=self.config_content_view)
-        append_to_container: list = self.store_manager_view.content.controls[0].content.controls
-        tile_to_append = new_config.build_config_tile()
-        tile_to_append.content.controls[1].on_click = lambda e: self.remove_self(e, self.store_manager_view.content.controls[0].content, new_config.id_key)
-        append_to_container.append(tile_to_append)
+    def tab_change(self, selected_tab):
+        self.refresh_tiles("drivers", global_drivers, Config, ConfigForm)
 
-        self.page.close(self.add_config_modal)
-        self.store_manager_view.update()
-
-    def remove_self(self, e, container_content, key) -> None:
-        """Removes a configuration tile from the container. And blanks out the content view"""
-        remove_from_selection(container_content, key)
-        self.config_content_view.content = Text("Please select a configuration")
-        self.config_content_view.update()
-
-    def build_store_view(self) -> Container:
-        """
-        Builds the main store manager view.
-
-        Returns:
-            Container: The main container for the store manager view.
-        """
-        return self.store_manager_view
+    def build_config_store_tab(self) -> Container:
+        return self.tab

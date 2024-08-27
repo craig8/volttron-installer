@@ -2,5 +2,6 @@
     "cSpell.words": [
         "Flet",
         "volttron"
-    ]
+    ],
+    "python.analysis.typeCheckingMode": "off"
 }

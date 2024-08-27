@@ -1,73 +1,104 @@
 from dataclasses import dataclass, field
-from flet import *
-import json
-from volttron_installer.modules.create_field_methods import field_pair, divide_fields
-from volttron_installer.modules.global_configs import global_agents, find_dict_index
-from volttron_installer.components.default_tile_styles import build_default_tile
 from volttron_installer.modules.styles import modal_styles
 from volttron_installer.modules.remove_from_controls import remove_from_selection
+from volttron_installer.components.default_tile_styles import build_default_tile
+from volttron_installer.components.base_tile import BaseForm, BaseTab, BaseTile
+from flet import *
 
 @dataclass
-class Agent:
+class ConfigTile:
     """
-    A class representing an individual Agent used for configuration.
+    Dataclass representing a configuration tile that can be displayed and interacted with.
 
     Attributes:
-        agent_name (str): The name of the agent.
-        default_identity (str): The default identity for the agent.
-        agent_path (str): The path where the agent is located.
-        agent_configuration (str): The configuration details of the agent.
-        id_key (int): A unique identifier key for the agent.
+        name (str): The name of the configuration.
+        type (str): The type of configuration (e.g., 'csv', 'json').
+        content (str): The content to be displayed when the tile is selected.
+        display_container (Container): The Flet container where the content will be displayed.
+        id_key (int): An auto-incremented identifier key for the tile.
     """
     counter = 0
-    agent_name: str
-    default_identity: str
-    agent_path: str
-    agent_configuration: str
+    name: str
+    type: str
+    content: str
+    display_container: Container
+    content_text_control: Text = field(init=False, default=None)
     id_key: int = field(init=False)
 
     def __post_init__(self):
-        """
-        Post-initialization to set the id_key and increment the counter.
-        """
-        self.id_key = Agent.counter
-        Agent.counter += 1
+        """Post-initialization function to set the id_key and increment the counter."""
+        self.id_key = ConfigTile.counter
+        ConfigTile.counter += 1
 
-    def build_agent_tile(self) -> Container:
-        agent_tile = build_default_tile(self.agent_name)
-        agent_tile.key = self.id_key
-        return agent_tile
+    def build_config_tile(self) -> Container:
+        """
+        Builds a configuration tile with a click event to display its content.
 
-class FormTemplate:
+        Returns:
+            Container: A Flet container representing the tile.
+        """
+        config_tile = build_default_tile(self.name)
+        config_tile.on_click = self.display_content
+        config_tile.key = self.id_key
+        return config_tile
+
+    def display_content(self, e) -> None:
+        """
+        Event handler to display the content of the configuration tile.
+        """
+        input_field = TextField(label=f"Input custom {self.type}")
+        submit_input = OutlinedButton(text="Submit", on_click=lambda e: self.submit(e, input_field))
+        compy = Row(controls=[input_field, submit_input])
+        
+        # Preserve the reference to the Text control to update it later
+        self.content_text_control = Text(value=self.content, size=24)
+        
+        lol = Column(
+            controls=[
+                compy,
+                self.content_text_control  # Reference to the text control
+            ],
+            spacing=15
+        )
+        self.display_container.content = lol
+        self.display_container.update()
+    
+    def submit(self, e, input_field):
+        self.content = input_field.value
+        if self.content_text_control:
+            self.content_text_control.value = self.content
+            self.content_text_control.update()
+        self.display_container.update()
+
+
+from volttron_installer.components.platform_components.platform import Platform
+
+class ConfigStoreManager:
     """
-    A class to handle the form template for agent registration and management.
-
+    Manages the configuration store interface, allowing users to add and view configurations.
+    Ideally, we'll include a text box for the user so they can edit the driver's configs.
+    
     Attributes:
-        agent_tab_view (Container): The main container view for the agent tab.
-        list_of_agents (Column): A column containing the list of agents.
         page (Page): The Flet page where the components are rendered.
-        agent (Agent): The agent being handled by the form.
-        agent_tile (Container): The agent tile container on the UI.
+        platform_specific (any): Platform-specific configurations or event handlers.
     """
-    def __init__(self, agent_tab_view, list_of_agents, page: Page, agent: Agent, agent_tile: Container):
+    def __init__(self, page: Page, global_event_bus) -> None:
         self.page = page
-        self.agent = agent
-        self.agent_tile = agent_tile
-        self.agent_tab_view = agent_tab_view
-        self.list_of_agents = list_of_agents
-        self.agent_tile.content.controls[1].on_click = self.remove_self
 
-        # Registering Components and Modal for Adding a Configuration
-        self.name_field = TextField(color="black", label="Name", on_change=self.validate_config_entry)
+        # Initialize global event bus
+        self.global_event_bus = global_event_bus
+
+        self.name_field = TextField(color="black", label="Name", on_change=self.validate_submit)
         self.csv_radio = Radio(value="csv")
         self.json_radio = Radio(value="json")
         self.add_config_button = OutlinedButton(
+            on_click=self.register_new_config,
             content=Text("Add", color="black"),
             disabled=True
         )
         self.type_radio_group = RadioGroup(
             value="",
-            on_change=self.validate_config_entry,
+            on_change=self.validate_submit,
             content=Row(
                 spacing=25,
                 controls=[
@@ -115,52 +146,32 @@ class FormTemplate:
                 content=self.modal_content
             ),
         )
-
-        # Form Fields for Agent Registration
-        self.agent_name_field = TextField(on_change=self.validate_submit)
-        self.default_identity_field = TextField(on_change=self.validate_submit)
-        self.agent_path_field = TextField(on_change=self.validate_submit)
-        self.agent_configuration_field = TextField(value="", on_change=self.validate_submit)
-        self.config_store_entry_key = OutlinedButton(text="Click Me!", on_click=lambda e: self.page.open(self.add_config_modal))
-        self.formatted_fields: list = divide_fields([
-            field_pair("Name", self.agent_name_field),
-            field_pair("Default Identity", self.default_identity_field),
-            field_pair("Agent Path", self.agent_path_field),
-            field_pair("Agent Configuration", self.agent_configuration_field),
-            field_pair("Config Store Entry Key", self.config_store_entry_key)
-        ])
-        self.submit_button = OutlinedButton(text="Save", disabled=True, on_click=self.save_agent_config)
-        self._form = Column(
-            expand=3,
-            controls=[
-                *self.formatted_fields,
-                self.submit_button,
-            ]
+        self.config_content_view = Container(
+            content=Text("Wow, so much content!")
         )
-
-    def remove_self(self, e) -> None:
-        """
-        Removes the agent from the global agent list and updates the UI.
-        """
-        index = find_dict_index(global_agents, self.agent.agent_name)
-        if index is not None:
-            global_agents.pop(index)
-            writting_to_agents()
-        else:
-            print("The agent you are trying to remove hasn't been properly registered yet.")
-        remove_from_selection(self.list_of_agents, self.agent.id_key)
-        self.agent_tab_view.content.controls[2] = Column(expand=3)
-        self.page.update()
-
-    def validate_config_entry(self, e) -> None:
-        """
-        Validates the configuration entry fields and enables/disables the submit button accordingly.
-        """
-        if self.name_field.value and self.type_radio_group.value != "":
-            self.add_config_button.disabled = False
-        else:
-            self.add_config_button.disabled = True
-        self.add_config_button.update()
+        self.store_manager_view = Container(
+            height=900,
+            padding=padding.only(left=10),
+            margin=margin.only(left=10, right=10, bottom=5, top=5),
+            bgcolor="#20f4f4f4",
+            border_radius=12,
+            content=Row(
+                controls=[
+                    Container(
+                        content=Column(
+                            controls=[
+                                OutlinedButton(
+                                    text="Add a Configuration",
+                                    on_click=lambda e: self.page.open(self.add_config_modal)
+                                ),
+                            ]
+                        )
+                    ),
+                    VerticalDivider(color="white", width=9, thickness=3),
+                    self.config_content_view
+                ]
+            )
+        )
 
     def radio_title_grouper(self, radio: Radio) -> Row:
         """
@@ -170,7 +181,7 @@ class FormTemplate:
             radio (Radio): The radio button for which to create the label.
 
         Returns:
-            Row: A row containing the radio button and its label, styling reasons.
+            Row: A row containing the radio button and its label for styling.
         """
         label = radio.value.upper()
         return Row(
@@ -182,150 +193,45 @@ class FormTemplate:
             ]
         )
 
-    def save_agent_config(self, e):
+    def display_agent_specific(self):
         """
-        Saves the host configuration and updates the global agent list.
+        Placeholder function, will need to think of a way to display agent specific
+        config stores 
         """
-        self.agent.default_identity = self.default_identity_field.value
-        self.agent.agent_path = self.agent_path_field.value
-        self.agent.agent_configuration = self.agent_configuration_field.value
-
-        old_name = self.agent.agent_name
-        index = find_dict_index(global_agents, old_name)
-        self.agent.agent_name = self.agent_name_field.value
-
-        if index is not None:
-            global_agents[index]["agent_name"] = self.agent.agent_name
-            global_agents[index]["default_identity"] = self.agent.default_identity
-            global_agents[index]["agent_path"] = self.agent.agent_path
-            global_agents[index]["agent_configuration"] = self.agent.agent_configuration
-        else:
-            agent_dictionary_appendable = {
-                "agent_name": self.agent.agent_name,
-                "default_identity": self.agent.default_identity,
-                "agent_path": self.agent.agent_path,
-                "agent_configuration": self.agent.agent_configuration,
-            }
-            global_agents.append(agent_dictionary_appendable)
-
-        self.agent_tile.content.controls[0].value = self.agent.agent_name
-        self.page.update()
-        write_to_agents(global_agents)
-
-    def check_json_submit(self, field: TextField) -> None:
-        """
-        Validates the JSON input in a text field.
-
-        Args:
-            field (TextField): The text field containing JSON input.
-        """
-        custom_json = field.value
-        if custom_json == "":
-            field.border_color = "black"
-            field.update()
-            return True
-
-        try:
-            json.loads(custom_json)
-            field.border_color = colors.GREEN
-            field.color = "white"
-            field.update()
-            return True
-        except json.JSONDecodeError:
-            field.border_color = colors.RED_800
-            field.color = colors.RED_800
-            field.update()
-            return False
+        print("config store manager says wsg w gangalaunche")
 
     def validate_submit(self, e) -> None:
         """
-        Validates the agent form fields and enables/disables the submit button accordingly.
+        Validates the form inputs and enables the submit button if valid.
         """
-        if (
-            self.agent_name_field.value and
-            self.agent_configuration_field.value and
-            self.agent_path_field.value and
-            self.default_identity_field.value != "" and
-            self.check_json_submit(self.agent_configuration_field)
-        ):
-            self.submit_button.disabled = False
+        if self.name_field.value and self.type_radio_group.value != "":
+            self.add_config_button.disabled = False
         else:
-            self.submit_button.disabled = True
-        self.submit_button.update()
+            self.add_config_button.disabled = True
+        self.add_config_button.update()
 
-    def build_agent_form(self) -> Column:
-        return self._form
+    def register_new_config(self, e) -> None:
+        """Registers a new configuration and updates the UI to include the new tile."""
+        new_config = ConfigTile(name=self.name_field.value, type=self.type_radio_group.value, content=f"{self.name_field.value}'s content", display_container=self.config_content_view)
+        append_to_container: list = self.store_manager_view.content.controls[0].content.controls
+        tile_to_append = new_config.build_config_tile()
+        tile_to_append.content.controls[1].on_click = lambda e: self.remove_self(e, self.store_manager_view.content.controls[0].content, new_config.id_key)
+        append_to_container.append(tile_to_append)
 
-class AgentSetupTab:
-    """
-    A class to manage the Agent Setup Tab interface.
+        self.page.close(self.add_config_modal)
+        self.store_manager_view.update()
 
-    Attributes:
-        page (Page): The Flet page where the components are rendered.
-    """
-    def __init__(self, page: Page) -> None:
-        self.page = page
-        self.placeholder = Column(expand=3)
-        self.list_of_agents = Column(
-            expand=2,
-            controls=[
-                OutlinedButton(text="Setup an Agent", on_click=self.add_new_agent)
-            ]
-        )
-        self.agent_tab_view = Container(
-            padding=padding.only(left=10),
-            margin=margin.only(left=10, right=10, bottom=5, top=5),
-            bgcolor="#20f4f4f4",
-            border_radius=12,
-            content=Row(
-                controls=[
-                    self.list_of_agents,
-                    VerticalDivider(color="white", width=9, thickness=3),
-                    self.placeholder
-                ]
-            )
-        )
+    def remove_self(self, e, container_content, key) -> None:
+        """Removes a configuration tile from the container. And blanks out the content view"""
+        remove_from_selection(container_content, key)
+        self.config_content_view.content = Text("Please select a configuration")
+        self.config_content_view.update()
 
-    def add_new_agent(self, e) -> None:
+    def build_store_view(self) -> Container:
         """
-        Adds a new agent and its corresponding form for setup.
-        """
-        new_agent = Agent(
-            agent_name="New Agent",
-            default_identity="",
-            agent_path="",
-            agent_configuration=""
-        )
-        agent_tile = new_agent.build_agent_tile()
-        agent_form = FormTemplate(
-            self.agent_tab_view,
-            self.list_of_agents,
-            self.page,
-            new_agent,
-            agent_tile
-        )
-        # Immediately assign the on_click function
-        agent_tile.on_click = lambda e: self.agent_is_selected(e, agent_form)
-        self.list_of_agents.controls.append(agent_tile)
-        self.list_of_agents.update()
+        Builds the main store manager view.
 
-    def agent_is_selected(self, e, agent_form: FormTemplate) -> None:
+        Returns:
+            Container: The main container for the store manager view.
         """
-        Displays the form for the selected agent.
-
-        Args:
-            e: The event object.
-            agent_form (FormTemplate): The form template for the selected agent.
-        """
-        self.agent_tab_view.content.controls[2] = agent_form.build_agent_form()
-        self.page.update()
-
-    def build_agent_setup_tab(self) -> Container:
-        """
-        Builds and returns the main container for the Agent Setup Tab.
-        """
-        return self.agent_tab_view
-
-# Function to write the agent data to a file
-def writting_to_agents() -> None:
-    write_to_agents(global_agents)
+        return self.store_manager_view
