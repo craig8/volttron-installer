@@ -61,7 +61,7 @@ class ConfigForm(BaseForm):
             )
         )
 
-        self.content_field = TextField(label="Paste or type your configuration", multiline=True, on_change=self.content_field_change)
+        self.content_field = TextField(label="Paste or type your configuration", multiline=True, on_change=self.content_field_change, value=self.config.content)
         self.json_content_editor = TextField(
                                 multiline=True,
                                 autofocus=True,
@@ -130,13 +130,16 @@ class ConfigForm(BaseForm):
         self.detected_content_format: str = self.config.type
         self.csv_data : str
         self.json_data : str
+        self.previous_data : str | None = None
         self.__post_init__()
 
     def __post_init__(self) -> None:
         self.update_detected_content_format()
+        self.content_field.value = self.content_value
         attempt_to_update_control(self.content_field)
         if self.config_mode == "JSON":
-            self.json_content_editor.value = prettify_json(self.json_content_editor.value)
+            self.json_content_editor.value = prettify_json(self.content_value)
+            attempt_to_update_control(self.json_content_editor)
         else:
             self.load_csv_to_data_table(self.content_value)
         self.plug_into_content_input_container()
@@ -306,6 +309,9 @@ class ConfigForm(BaseForm):
                 return False
 
     def type_change(self, e):
+        # WOW, THIS IS JUST SILLY.
+
+
         # This means if our OLD type was JSON
         if self.config_mode == "JSON":
            self.content_value = self.clean_json_string(self.json_content_editor.value)
@@ -322,6 +328,17 @@ class ConfigForm(BaseForm):
 
         self.update_fields(None)
         self.validate_fields(e)
+
+        # This means if our OLD type was JSON
+        if self.config_mode == "JSON":
+           self.content_value = self.clean_json_string(self.json_content_editor.value)
+        # Was our OLD type CSV?
+        elif self.config_mode == "CSV":
+            self.content_value = self.data_table_to_csv()
+        
+        self.content_field.value = self.content_value
+        attempt_to_update_control(self.content_field)
+
 
     def save_config(self, e) -> None:
         # Update the config object with current values from the fields
