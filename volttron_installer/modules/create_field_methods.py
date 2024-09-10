@@ -3,7 +3,7 @@ from flet import Container, Text, Row, padding, Divider
 # create a field pair 
 def field_pair(field_title, input) -> Container:
     return Container(
-        height=70,
+        #height=70,
         padding=padding.only(top=10, bottom=10, left=5, right=5),
         content=Row(
             controls=[

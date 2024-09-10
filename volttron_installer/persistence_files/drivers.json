@@ -1,12 +1,1 @@
-[
-    {
-        "name": "a",
-        "type": "CSV",
-        "content": "cold"
-    },
-    {
-        "name": "jijjij",
-        "type": "CSV",
-        "content": "cold"
-    }
-]
+[{"name": "we love csv", "type": "CSV", "content": "we,love,csv\r\nyes,we,do\r\nwe,love,it\r\nso,much,yay\r\n"}, {"name": "slowly", "type": "JSON", "content": "{\n    \"A\": \"B\",\n    \"we\": \"love fortnite\",\n    \"then\" : \"wewon\"\n}"}, {"name": "ghghg", "type": "CSV", "content": "q,w,e,r,t\r\na,s,d,f,f\r\nz,x,c,v,b\r\nj,k,l,;,'\r\nn,m,,.,/\r\n"}, {"name": "lookierookie", "type": "JSON", "content": "{\"they\":\"lub\",\"my\":\"custom\",\"configurations\":\"in\",\"the\":\"hood\",\"type\":\"Shpeel\"}"}, {"name": "lll;", "type": "JSON", "content": ""}, {"name": "ZZZ", "type": "JSON", "content": "{\"they\": \"lub\", \"my\": \"custom\", \"configurations\": \"in\", \"the\": \"hood\", \"type\": \"Shpeel\"}"}]

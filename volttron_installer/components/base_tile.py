@@ -34,28 +34,34 @@ class BaseForm:
         self.form_fields = form_fields
         self.val_constructor = []
         self.non_fields = []
-        self.additional_content = Container() #blank ahh container
+        self.additional_content = [] # for anything special
+
         for key, field in self.form_fields.items():
-            if isinstance(field, Container):
-                field = Container(content=Text("COMPYYYY"))
-                self.additional_content = field
+            if isinstance(field, TextField):
+                self.val_constructor.append(field)
             else:
-                if isinstance(field, TextField):
-                    self.val_constructor.append(field)
-                else:
-                    self.non_fields.append(field)
+                self.classify_field(field)
 
         self.submit_button = OutlinedButton(text="Save", disabled=True, on_click=self.save_config)
         self.formatted_fields: any = self.create_fields()
         self._form = Column(
+            #scroll=ScrollMode.ALWAYS,
             expand=3,
             controls=[
                 *self.formatted_fields,
                 self.submit_button,
-                self.additional_content
+                *self.additional_content
             ]
         )
-    
+    def classify_field(self, field):
+        if hasattr(field, "key"):
+            if field.key == "pass":
+                self.additional_content.append(field)
+            else:
+                self.non_fields.append(field)
+        else:
+            self.non_fields.append(field)
+
     def refresh_form(self, instance: object) -> None:
         """Post init, will refresh form values"""
         instance_fields = fields(instance)
@@ -104,9 +110,50 @@ class BaseTab:
     def __init__(self, instance_tile_column: Column, page: Page):
         self.page = page
         self.instance_tile_column = instance_tile_column
-        self.tab = self.build_base_tab(Column(expand=3))
 
-    def build_base_tab(self, form: Control):
+        # Initialize column widths
+        self.left_column_width = 200  # Initial width for the instance tile column
+        self.right_column_width = page.width - self.left_column_width - 10  # Initial width for the form column
+        
+        self.left_instance_column: Container = Container(
+                                        width=self.left_column_width,
+                                        content=self.instance_tile_column
+                                    )
+        self.tab = self.build_base_tab()
+        self.__post_init__()
+
+    def __post_init__(self)->None:
+        pass
+        #self.left_instance_column.content.scroll=ScrollMode.ALWAYS
+
+    def build_base_tab(self):
+        # Initialize form container
+        form_container = Container(width=self.right_column_width, content=Column(expand=3))
+
+        def pan_update(e):
+            # Perform the panning logic to adjust column widths
+            self.left_column_width = max(200, self.left_column_width + e.delta_x)  # Set a minimum width of 50
+            self.right_column_width = max(300, self.page.width - self.left_column_width - 10)  # Adjust the width of the right column
+
+            # Update the dimensions of the container elements
+            self.instance_tile_column.width = self.left_column_width
+            form_container.width = self.right_column_width
+
+            # Refresh the UI
+            self.instance_tile_column.update()
+            form_container.update()
+            self.page.update()
+        
+        vertical_divider = GestureDetector(
+            mouse_cursor=MouseCursor.RESIZE_COLUMN,
+            content=VerticalDivider(
+                width=3,
+                thickness=3,
+                color="white"
+            ),
+            on_pan_update=pan_update
+        )
+
         tab_view = Container(
             height=900,
             padding=padding.only(left=10),
@@ -117,13 +164,14 @@ class BaseTab:
                 spacing=0,
                 controls=[
                     self.instance_tile_column,
-                    VerticalDivider(color="white", width=3, thickness=3),
-                    form
-                ]
+                    vertical_divider,
+                    form_container
+                ],
+                expand=True
             )
         )
         return tab_view
-    
+        
     def refresh_tiles(self, file_name: str, global_list: list, instance_cls: object, instance_form_cls: object):
         if self.contains_container() == False:
             for item in global_list:
@@ -191,6 +239,5 @@ class BaseTab:
         global_event_bus.publish("update_global_ui", None)
     
     def show_selected_form(self, e, instance_form: BaseForm) -> None:
-        self.tab.content.controls[2] = instance_form.build_form()
+        self.tab.content.controls[2].content = instance_form.build_form()
         self.page.update()
-

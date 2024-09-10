@@ -1,11 +1,14 @@
 from volttron_installer.components.base_tile import BaseForm, BaseTab, BaseTile
 from flet import *
+from volttron_installer.modules.attempt_to_update_control import attempt_to_update_control
 from volttron_installer.modules.global_configs import global_agents, find_dict_index
 from volttron_installer.modules.global_event_bus import global_event_bus
-from volttron_installer.modules.styles import modal_styles
+from volttron_installer.modules.styles import modal_styles2
 from dataclasses import dataclass, field
 from volttron_installer.modules.populate_dropdowns import numerate_configs_dropdown
 import json
+# Checklist: update JSON validator to include the global JSON validator module
+
 
 key_constructor =[
     "agent_name",
@@ -41,16 +44,10 @@ class AgentForm(BaseForm):
         global_event_bus.subscribe("update_global_ui", self.update_ui)
 
         self.config_dropdown = numerate_configs_dropdown()
-        self.config_dropdown.border_color= "black"
-        self.config_dropdown.color="black"
-        self.save_config_store_entry_button=OutlinedButton(
-                                                text="_____",
-                                                content=Text("Save", color="black")
-                                            )
         self.modal_content = Column(
                         horizontal_alignment=CrossAxisAlignment.CENTER,
                         controls=[
-                            Text("Edit Store Entries", size=20, color="black"),
+                            Text("Edit Store Entries", size=20),
                             Row(
                                 spacing = 10,
                                 controls=[
@@ -66,7 +63,8 @@ class AgentForm(BaseForm):
                                     controls=[
                                         OutlinedButton(on_click=lambda e: self.page.close(self.modal),
                                                     content=Text("Cancel", color="red")),
-                                        self.save_config_store_entry_button
+                                        OutlinedButton(on_click=self.save_config_store_entries, 
+                                                       text="Save")
                                     ],
                                     alignment=MainAxisAlignment.SPACE_BETWEEN
                                 )
@@ -77,7 +75,7 @@ class AgentForm(BaseForm):
                         modal = False,
                         bgcolor="#00000000",
                         content=Container(
-                            **modal_styles(),
+                            **modal_styles2(),
                             width=400,
                             height=250,
                             content=self.modal_content
@@ -89,13 +87,13 @@ class AgentForm(BaseForm):
             "Default Identity" : self.default_identity_field,
             "Agent Path" : self.agent_path_field,
             "Agent Configuration" : self.agent_configuration_field,
-            "Config Store Entries" : OutlinedButton(text="Edit", on_click=lambda e: self.page.open(self.modal))
+            "Config Store Entries" : OutlinedButton(text="Edit", on_click=lambda e: self.page.open(self.modal)),
         }
 
         super().__init__(page, form_fields)
         self.agent: Agent = agent
         self.json_validity = True
-        self.added_config_store_entries = None
+        self.added_config_store_entries = []
  
     """
     self.added_config_store_entries = [
@@ -108,10 +106,13 @@ class AgentForm(BaseForm):
         }
     """
 
+    def save_config_store_entries(self, e) -> None:
+        self.added_config_store_entries.append(self.config_dropdown.value)
+
     def update_ui(self, var = None)-> None:
         print("agent_setup.py has received `update_global_ui`")
         self.config_dropdown = numerate_configs_dropdown()
-        self.config_dropdown.update()
+        attempt_to_update_control(self.config_dropdown)
 
     def validate_fields(self, e) -> None:
         # Implement field validation logic and toggle submit button state.
@@ -145,7 +146,7 @@ class AgentForm(BaseForm):
             global_agents.append(agent_dictionary_appendable)
 
         self.agent.tile.content.controls[0].value = self.agent.agent_name
-        self.page.update()
+        attempt_to_update_control(self.page)
         self.write_to_file("agents", global_agents)
         update_global_ui()
 
@@ -159,18 +160,18 @@ class AgentForm(BaseForm):
         custom_json = field.value
         if custom_json == "" or None or " ":
             field.border_color = "black"
-            field.update()
+            attempt_to_update_control(field)
             self.json_validity = True
         try:
             json.loads(custom_json)
             field.border_color = colors.GREEN
             field.color = "white"
-            field.update()
+            attempt_to_update_control(field)
             self.json_validity = True
         except json.JSONDecodeError:
             field.border_color = colors.RED_800
             field.color = colors.RED_800
-            field.update()
+            attempt_to_update_control(field)
             self.json_validity = False
         self.validate_fields(e= e)
         
