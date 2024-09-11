@@ -1,1 +1,1 @@
-[{"agent_name": "configued", "default_identity": "f", "agent_path": "h", "agent_configuration": "{\"A\":\"A\"}"}]
+[{"agent_name": "configued", "default_identity": "f", "agent_path": "h", "agent_configuration": "{\"A\":\"A\"}"}, {"agent_name": "zaka", "default_identity": "voltteon", "agent_path": "the/only/path", "agent_configuration": "{\"A\":\"A\"}"}]

@@ -34,12 +34,13 @@ def check_json_field(field: TextField) -> bool:
     if not custom_json:
         field.border_color = "black"
         field.update()
-        return True
+        return False
 
     try:
-        json.loads(custom_json)
+        loaded_json = json.loads(custom_json)
         field.border_color = colors.GREEN
         field.color = "white"
+        field.value = json.dumps(loaded_json, indent=4)
         field.update()
         return True
     except json.JSONDecodeError:

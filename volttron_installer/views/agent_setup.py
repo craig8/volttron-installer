@@ -1,6 +1,7 @@
 from volttron_installer.components.base_tile import BaseForm, BaseTab, BaseTile
 from flet import *
 from volttron_installer.modules.attempt_to_update_control import attempt_to_update_control
+from volttron_installer.modules.clean_json_string import clean_json_string
 from volttron_installer.modules.global_configs import global_agents, find_dict_index
 from volttron_installer.modules.global_event_bus import global_event_bus
 from volttron_installer.modules.styles import modal_styles2
@@ -127,7 +128,7 @@ class AgentForm(BaseForm):
         # Save field values to agent attributes
         self.agent.default_identity = self.default_identity_field.value
         self.agent.agent_path = self.agent_path_field.value
-        self.agent.agent_configuration = self.agent_configuration_field.value
+        self.agent.agent_configuration = clean_json_string(self.agent_configuration_field.value)
 
         # Save old name to a variable so we can see if it was originally in global_agents
         old_name = self.agent.agent_name

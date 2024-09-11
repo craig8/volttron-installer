@@ -1,6 +1,6 @@
-from email.errors import CloseBoundaryNotFoundDefect
 from volttron_installer.components.base_tile import BaseForm, BaseTab, BaseTile
 from flet import *
+from volttron_installer.modules.styles import modal_styles2
 from volttron_installer.modules.global_configs import global_drivers, find_dict_index
 from volttron_installer.modules.validate_field import  check_json_field
 from volttron_installer.modules.global_event_bus import global_event_bus
@@ -12,7 +12,7 @@ from volttron_installer.modules.styles import data_table_styles
 import csv
 import io
 import json
-
+import asyncio
 # PLAN: MAKE CONTENT FIELD BE PARCED AND FORM THE DATATABLE BASED OFF OF IT AND HAVE ERROR HANDLING IF IMPROPER
 # CONTENT WAS PASTED IN
 # REWRITE DATATABLE STRUCTURE
@@ -45,12 +45,13 @@ class Config(BaseTile):
 class ConfigForm(BaseForm):
     def __init__(self, config, page: Page):
         self.config: Config = config # initialized Config
+        self.config_mode: str = "JSON" if self.config.type in [None, "", " "] else self.config.type
         self.page = page
 
         self.name_field = TextField(on_change=self.validate_fields)
         self.view_type_radio_group = RadioGroup(
             disabled=False,
-            value=self.config.type,
+            value=self.config_mode,
             on_change=self.type_change,
             content=Row(
                 spacing=25,
@@ -61,7 +62,6 @@ class ConfigForm(BaseForm):
             )
         )
 
-        self.content_field = TextField(label="Paste or type your configuration", multiline=True, on_change=self.content_field_change, value=self.config.content)
         self.json_content_editor = TextField(
                                 multiline=True,
                                 autofocus=True,
@@ -72,7 +72,7 @@ class ConfigForm(BaseForm):
                                 expand=True,
                                 on_change=self.validate_fields,
                             )
-        self.content_input_container: Container = Container(content=Text("Please select the type of content")) # blank container that will have its content plugged in and out depending on type of input field
+        self.content_input_container: Container = Container() # blank container that will have its content plugged in and out depending on type of input field
         
         self.content_container: Container = Container(
             key="pass",
@@ -100,43 +100,25 @@ class ConfigForm(BaseForm):
                                 column_spacing=0,
                                 horizontal_margin=0,
                                 columns=data_table_columns,
-                                #[
-                                    # DataColumn(
-                                    #     label=Container(content=Text("Empty Column", color="black", weight="bold")),
-                                    # )
-                                #],
                                 rows=data_table_rows,
-                                # [
-                                #     DataRow(
-                                #         cells=[
-                                #             DataCell(content=Text("Empty Cell"))
-                                #         ]
-                                #     )
-                                # ]
                             )
         
         form_fields = {
             "Name": self.name_field,
             "View": self.view_type_radio_group,
-            "Content" : Container(content=self.content_field),
             "content container" : self.content_container,
         }
 
         super().__init__(page, form_fields)
-        self.config_mode: str | None = self.config.type if isinstance(self.config.type, str) else None
-        self.content_field_validity: bool[False] = False
         self.submit: bool = False
+        self.content_validity: bool= False
+
+        self.overwrite: bool = False
         self.content_value: str = self.config.content if isinstance(self.config.content, str) else ""
         self.detected_content_format: str = self.config.type
-        self.csv_data : str
-        self.json_data : str
-        self.previous_data : str | None = None
         self.__post_init__()
 
     def __post_init__(self) -> None:
-        self.update_detected_content_format()
-        self.content_field.value = self.content_value
-        attempt_to_update_control(self.content_field)
         if self.config_mode == "JSON":
             self.json_content_editor.value = prettify_json(self.content_value)
             attempt_to_update_control(self.json_content_editor)
@@ -147,12 +129,8 @@ class ConfigForm(BaseForm):
     def update_detected_content_format(self)-> None:
         self.detected_content_format: str = identify_string_format(self.content_value)
 
-    def content_field_change(self, e) -> None:
-        # Set the new content value
-        self.content_value = e.control.value
-        self.update_fields(None)
-
     def load_csv_to_data_table(self, csv_string: str =None) -> None:
+        # maybe one day implement a method to expand the datatable if the json conversions has too many columns
         input_data = csv_string
         input_io = io.StringIO(input_data)
         reader = csv.reader(input_io)
@@ -223,7 +201,6 @@ class ConfigForm(BaseForm):
             # Avoid writing a row if it has no valid data
             if csv_row:
                 csv_writer.writerow(csv_row)
-        print("this is what im outputting as data_table to csv: ", output.getvalue)
         return output.getvalue()
 
     def craft_data_column(self)-> DataColumn:
@@ -258,18 +235,9 @@ class ConfigForm(BaseForm):
         elif self.detected_content_format == "JSON":
             self.json_content_editor.value = prettify_json(self.content_value)
             self.load_csv_to_data_table(json_string_to_csv_string(self.content_value))
-        attempt_to_update_control(self.content_field)
         attempt_to_update_control(self.json_content_editor)
 
         self.validate_fields(None)
-
-
-    def attempt_to_update_control(self, control: Control)->None:
-        if control.page:
-            try:
-                control.update()
-            except Exception as ex:
-                print("Unexpected error updating control at memory address: {control}", ex)
 
     def plug_into_content_input_container(self):
         if self.config_mode == "JSON":
@@ -292,26 +260,25 @@ class ConfigForm(BaseForm):
         fields = [self.form_fields[i].value for i in self.form_fields.keys() if hasattr(self.form_fields[i], 'value')]
         all_fields_valid = all(fields)
 
-        content_valid = self.correct_input() is not False
-
-        if all_fields_valid and content_valid and self.submit:
+        self.correct_input()
+        if all_fields_valid and self.content_validity:
             self.toggle_submit_button(True)  # Enable button if all fields are valid
         else:
             self.toggle_submit_button(False)  # Disable button if any field is not valid
 
     def correct_input(self) -> bool:
         if self.config_mode == "CSV":
-            return True
+            self.content_validity = True
         elif self.config_mode == "JSON":
             if self.json_content_editor.page:  # Ensure json_content_field is in page
-                return check_json_field(self.json_content_editor)
+                if check_json_field(self.json_content_editor):
+                    self.content_validity = True
+                else:
+                    self.content_validity = False
             else:
                 return False
 
     def type_change(self, e):
-        # WOW, THIS IS JUST SILLY.
-
-
         # This means if our OLD type was JSON
         if self.config_mode == "JSON":
            self.content_value = self.clean_json_string(self.json_content_editor.value)
@@ -319,8 +286,6 @@ class ConfigForm(BaseForm):
         elif self.config_mode == "CSV":
             self.content_value = self.data_table_to_csv()
         
-        self.content_field.value = self.content_value
-        attempt_to_update_control(self.content_field)
 
         self.config_mode = e.control.value
         self.submit = True
@@ -329,19 +294,64 @@ class ConfigForm(BaseForm):
         self.update_fields(None)
         self.validate_fields(e)
 
-        # This means if our OLD type was JSON
-        if self.config_mode == "JSON":
-           self.content_value = self.clean_json_string(self.json_content_editor.value)
-        # Was our OLD type CSV?
-        elif self.config_mode == "CSV":
-            self.content_value = self.data_table_to_csv()
-        
-        self.content_field.value = self.content_value
-        attempt_to_update_control(self.content_field)
+    async def warning_modal(self, new_name: str) -> bool:
+        loop = asyncio.get_event_loop()
+
+        def no_overwrite(e):
+            self.page.close(modal)
+            self.overwrite = False
+            loop.call_soon_threadsafe(future.set_result, False)
+
+        def enable_overwrite(e):
+            self.page.close(modal)
+            self.overwrite = True
+            loop.call_soon_threadsafe(future.set_result, True)
+
+        modal_content = Column(
+            alignment= alignment.center,
+            controls=[
+                Text("WARNING!", color="red", size=22),
+                Text(f"You're about to overwrite a driver named: {new_name}", size=18),
+                Row(
+                    alignment=MainAxisAlignment.SPACE_AROUND,
+                    controls=[
+                        OutlinedButton(content=Text("Cancel", color="red"), on_click=no_overwrite),
+                        OutlinedButton(text="Overwrite", on_click=enable_overwrite)
+                    ]
+                )
+            ]
+        )
+
+        modal = AlertDialog(
+            modal=False,
+            bgcolor="#00000000",
+            content=Container(
+                **modal_styles2(),
+                width=400,
+                height=170,
+                content=modal_content
+            )
+        )
+
+        # Create a future for the result
+        future = loop.create_future()
+        self.page.open(modal)
+        await future
+        return self.overwrite
 
 
-    def save_config(self, e) -> None:
+    async def save_config(self, e) -> None:
         # Update the config object with current values from the fields
+        for config in global_drivers:
+            if config["name"] == self.name_field.value:
+                overwrite_decision = await self.warning_modal(self.name_field.value)
+                if overwrite_decision:
+                    global_event_bus.publish("soft_remove", self.config.tile.key)
+                    break # break out of for loop because user chose to overwrite
+                else:
+                    return  # Cancel saving process if user decides not to overwrite the config
+
+        # If no existing config with the same name, or if user chooses to overwrite
         self.config.type = self.view_type_radio_group.value
         
         content_data=self.content_value
@@ -354,6 +364,9 @@ class ConfigForm(BaseForm):
         self.config.content = content_data
 
         old_config_name = self.config.name
+        if self.config.name == "Configure Me!":
+            old_config_name = self.name_field.value # if it was a placeholder name, allows newly formed configs to overwrite old configs
+
         self.config.name = self.name_field.value
         index = find_dict_index(global_drivers, old_config_name)
 
@@ -391,6 +404,7 @@ class ConfigStoreManagerTab(BaseTab):
         super().__init__(self.list_of_configs, page)
         self.page = page
         global_event_bus.subscribe("tab_change", self.tab_change)
+        global_event_bus.subscribe("soft_remove", self.soft_remove)
 
     def add_new_config(self, e) -> None:
         self.add_new_tile(global_drivers, "drivers", Config, ConfigForm)

@@ -226,18 +226,27 @@ class BaseTab:
                 return True
         return False
     
+    def soft_remove(self, key: str) -> None:
+        """In the case of an over written config, we simply remove the tile from view
+        as we can just use our old overwritten config 
+        """
+        remove_from_selection(self.instance_tile_column, key)
+        self.tab.content.controls[2] = Column(expand=3)
+        self.page.update()
+    
     def remove_self(self, global_lst: list, file_name: str, instance_attributes: dict):
         index = find_dict_index(global_lst, instance_attributes["name"])
         if index is not None:
             global_lst.pop(index)
             write_to_file(file_name, global_lst)
         else:
-            print("The instance you are trying to remove hasn't been properly registered yet.")
+            print("The instance you are trying to remove hasn't been properly registered yet. It has been removed")
         remove_from_selection(self.instance_tile_column, instance_attributes["id"])
         self.tab.content.controls[2] = Column(expand=3)
         self.page.update()
         global_event_bus.publish("update_global_ui", None)
     
     def show_selected_form(self, e, instance_form: BaseForm) -> None:
+        print("I should be showing a form dude")
         self.tab.content.controls[2].content = instance_form.build_form()
         self.page.update()

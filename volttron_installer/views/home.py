@@ -138,4 +138,4 @@ def home_view(page: Page) -> View:
     return view
 
 
-global_event_bus.publish("tab_change", None)
+global_event_bus.publish("tab_change", None) # trying to populate everything ONCE IT LOADS

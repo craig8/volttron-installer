@@ -1,4 +1,4 @@
-from flet import Control, Page
+from flet import Control
 
 def attempt_to_update_control(control: Control)->None:
     if control.page:
