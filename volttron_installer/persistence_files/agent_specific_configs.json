@@ -1,0 +1,20 @@
+[
+    {
+        "agent_name": "configued",
+        "config_store_entries": {
+            "we love csv": {
+                "type": "JSON:",
+                "content": "{\"get\": \"overwritten\", \"haha\": \"nerd\"}"
+            }
+        }
+    },
+    {
+        "agent_name": "zaka",
+        "config_store_entries": {
+            "zaka laka": {
+                "type": "JSON",
+                "content": "{'foo': 'wsg', 'Wym': 'at'}"
+            }
+        }
+    }
+]

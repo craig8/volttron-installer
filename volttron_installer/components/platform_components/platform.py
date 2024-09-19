@@ -53,7 +53,7 @@ class ObjectCommunicator:
         # { signal : [** list of subscribers' process_data() functions **]}
         self._subscribers = {}
 
-    def subscribe(self, event_type, subscriber):
+    def subscribe(self, event_type: str, subscriber):
         """
         Subscribes an object to a specific event type.
 
@@ -82,14 +82,16 @@ class Platform:
     def __init__(self, title: str, page: Page, generated_url: str, event_bus: ObjectCommunicator, global_bus: ObjectCommunicator) -> None:
         self.title = title
         self.page = page
-        self.generated_url = generated_url
+        self.generated_url = generated_url # platform's UID
 
         self.address = ""
         self.bus_type= "Zmq"
         self.ports = ""
 
-        self.added_hosts = {}
+        self.added_hosts = {} # host_id : {key:val, key:val}
         self.added_agents = {} # agent name : [agent object, custom JSON (defaults to False if none)]
+# we can use the agent name to parce the agents.json file and get the rest of what we need to deploy
+        
         self.activity: str = "OFF"  # OFF by default
         self.event_bus: ObjectCommunicator = event_bus  # Initialize the Object communicator for all platform components
         

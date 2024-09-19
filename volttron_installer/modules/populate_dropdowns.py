@@ -11,5 +11,6 @@ def numerate_host_dropdown() -> Dropdown:
     return Dropdown(options=dropdown_options)
 
 def numerate_configs_dropdown() -> Dropdown:
+    print(global_drivers)
     dropdown_options = [dropdown.Option(text=driver["name"]) for driver in global_drivers]
     return Dropdown(options=dropdown_options)

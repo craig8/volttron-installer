@@ -75,6 +75,7 @@ class HostForm(BaseForm):
         self.host.tile.content.controls[0].value = self.host.host_id
         self.page.update()
         self.write_to_file("hosts", global_hosts)
+        global_event_bus.publish("update_global_ui")
 
 class HostTab(BaseTab):
     def __init__(self, page: Page) -> None:

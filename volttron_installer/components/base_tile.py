@@ -4,6 +4,7 @@ from volttron_installer.modules.write_to_json import write_to_file, dump_to_var
 from volttron_installer.modules.global_configs import find_dict_index
 from volttron_installer.modules.global_event_bus import global_event_bus
 from volttron_installer.modules.remove_from_controls import remove_from_selection
+from volttron_installer.modules.attempt_to_update_control import attempt_to_update_control
 from flet import *
 from dataclasses import fields
 
@@ -172,7 +173,7 @@ class BaseTab:
         )
         return tab_view
         
-    def refresh_tiles(self, file_name: str, global_list: list, instance_cls: object, instance_form_cls: object):
+    def refresh_tiles(self, file_name: str, global_list: list[dict], instance_cls: object, instance_form_cls: object):
         if self.contains_container() == False:
             for item in global_list:
                 instance_cls_field = fields(instance_cls)
@@ -214,9 +215,9 @@ class BaseTab:
 
     def configure_new_instance(self, file_name: str, global_list: list, instance_values, tile: Container, form: BaseForm, instance):
         tile.on_click =lambda e: self.show_selected_form(e, form)
-        tile.content.controls[1].on_click = lambda e: self.remove_self(global_list, file_name, {"name" : instance_values[0], "id" : tile.key})
+        tile.content.controls[1].on_click = lambda e: self.remove_self(global_list, file_name, instance_attributes={"name" : instance_values[0], "id" : tile.key})
         self.instance_tile_column.controls.append(tile)
-        self.instance_tile_column.update()
+        attempt_to_update_control(self.instance_tile_column)
         form.refresh_form(instance)
 
     def contains_container(self):
@@ -231,7 +232,7 @@ class BaseTab:
         as we can just use our old overwritten config 
         """
         remove_from_selection(self.instance_tile_column, key)
-        self.tab.content.controls[2] = Column(expand=3)
+        self.tab.content.controls[2].content = Column(expand=3)
         self.page.update()
     
     def remove_self(self, global_lst: list, file_name: str, instance_attributes: dict):
@@ -242,11 +243,11 @@ class BaseTab:
         else:
             print("The instance you are trying to remove hasn't been properly registered yet. It has been removed")
         remove_from_selection(self.instance_tile_column, instance_attributes["id"])
-        self.tab.content.controls[2] = Column(expand=3)
+        self.tab.content.controls[2].content = Column(expand=3)
         self.page.update()
         global_event_bus.publish("update_global_ui", None)
     
     def show_selected_form(self, e, instance_form: BaseForm) -> None:
-        print("I should be showing a form dude")
         self.tab.content.controls[2].content = instance_form.build_form()
         self.page.update()
+        attempt_to_update_control(self.tab)

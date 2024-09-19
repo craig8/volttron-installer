@@ -1,3 +1,38 @@
-[
-    
-]
+{
+    "uid" : {
+        "name" : "blah",
+        "host" : {
+            "hosety": {
+                "ssh_sudo_user" : "A",
+                "identity_file" : "ba",
+                "ssh_ip_address" : "bug",
+                "ssh_port" : "lol"
+            }
+        },
+        "address" : "tcp://192.168.135.35:22916",
+        "ports" : "22916",
+        "bus" : "zmq",
+        "status" : "deployed",
+        "state" : "running",
+        "agents" : {
+            "zaka" : {
+                "default_identity" : "voltteon",
+                "agent_path" : "the/only/path",
+                "agent_config" : {
+                    "a":"A"
+                },
+                "config_store_entries" : {
+                    "we love csv" : {
+                        "get" : "overwritten",
+                        "haha" : "nerd"
+                    },
+                    "do we really love csv though" : {
+                        "we" : "yes",
+                        "love" : "we",
+                        "csv" : "do"
+                    }
+                }
+            }
+        }
+    }
+}

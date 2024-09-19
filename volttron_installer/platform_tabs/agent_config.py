@@ -2,6 +2,10 @@ from flet import *
 from volttron_installer.components.agent import Agent
 from volttron_installer.components.platform_components.platform import Platform
 from volttron_installer.modules.populate_dropdowns import numerate_agent_dropdown
+from volttron_installer.modules.global_configs import agent_specific_configs, global_agents
+from volttron_installer.platform_tabs import agency
+from volttron_installer.modules.attempt_to_update_control import attempt_to_update_control
+import yaml
 
 class AgentConfig:
     def __init__(self, shared_instance: Platform, platform_config_column, agent_config_column) -> None:
@@ -10,7 +14,8 @@ class AgentConfig:
         self.platform: Platform = shared_instance
 
         # Subscribe to event
-        self.platform.event_bus.subscribe("append_agent_row", self.process_data)
+        self.platform.event_bus.subscribe("append_agent_row", self.append_agent_row)
+#        self.platform.event_bus.subscribe("remove_agent", self.remove)
         self.platform.event_bus.subscribe("update_global_ui", self.update_self_ui)
 
         # Platform agent column and Agent config column
@@ -37,18 +42,26 @@ class AgentConfig:
             )
 
         self.divider = VerticalDivider(color="white", width=9, thickness=3)
-        self._comprehensive_view = Container(
-            height=600,
-            margin=margin.only(left=10, right=10, bottom=5, top=5),
-            bgcolor="#20f4f4f4",
-            border_radius=12,
-            content=Row(
-                controls=[
-                    self.agent_config_column,
-                    self.divider,
-                    self.configure_agent_view
-                ]
-            )
+        self._comprehensive_view = Column(
+            controls=[
+                Container(
+                    height=600,
+                    margin=margin.only(left=10, right=10, bottom=5, top=5),
+                    bgcolor="#20f4f4f4",
+                    border_radius=12,
+                    content=Row(
+                        controls=[
+                            self.agent_config_column,
+                            self.divider,
+                            self.configure_agent_view
+                        ]
+                    )
+                ),
+                Container(
+                    height=900
+                )
+            ],
+            scroll=ScrollMode.AUTO
         )
 
     def update_self_ui(self, data= None):
@@ -56,12 +69,7 @@ class AgentConfig:
         self.agent_config_column.controls[0] = updated_agent_dropdown
         self.platform.page.update()
 
-    # helper function to add agent to Agent config view
-    def process_data(self, data):
-        print("Agent Config received:", data)
-        eval(data)
-
-    def append_agent_row(self) -> None:
+    def append_agent_row(self, data=None) -> None:
         # Grab the most recently added agent by name
         recent_agent = list(self.platform.added_agents.keys())[-1]
         agent: Agent = self.platform.added_agents[recent_agent][0]
@@ -69,22 +77,30 @@ class AgentConfig:
         self.agent_config_column.controls.append(agent_row)
         
         # Get the container that encases the row and assign it a new onclick function
-        agent_row.on_click = lambda e: self.display_agent_config_menu(agent, e)
+        agent_row.on_click = lambda e: self.display_agent_config_store(agent, e)
 
         # Update all the changes thus far
         self.agent_config_column.update()
 
 
-    # Replace placeholder with the individualized agent config menu
-    def display_agent_config_menu(self, agent: Agent, e) -> None:
+    # Replace placeholder with the individualized agent config store
+    def display_agent_config_store(self, agent: Agent, e) -> None:
         self.configure_agent_view.content = agent.build_agent_configuration()
         self.configure_agent_view.update()
-    
+        agent_specific_config_store = agency.LocalConfigStoreManagerTab(
+                                                self.platform.page,
+                                                self.platform,
+                                                agent
+                                                )
+        self._comprehensive_view.controls[1] = agent_specific_config_store.build_config_store_tab()
+        self.platform.event_bus.publish("display_agent_config_manager")
+        attempt_to_update_control(self._comprehensive_view)
+        
+
     # repeated code from platform_config.py, Not happy with this. 
     def add_agent(self, e) -> None:
-        print(self.agent_dropdown.value)
         if self.agent_dropdown.value not in self.platform.added_agents and self.agent_dropdown.value != None:
-            agent_tile_to_add = Agent(self.agent_dropdown.value, self.platform_config_agent_column, self.agent_config_column, self.platform.added_agents)
+            agent_tile_to_add = Agent(self.platform, self.agent_dropdown.value, self.platform_config_agent_column, self.agent_config_column, self.platform.added_agents)
 
             # Appending to added_agents in the shared instance of Platform
             self.platform.added_agents[self.agent_dropdown.value] = [agent_tile_to_add, False] # False because agent doesn't have custom JSON yet

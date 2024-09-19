@@ -1,11 +1,12 @@
 # home.py
 
-import platform
 from flet import *
 
 from typing import Callable
 
 import logging
+
+from volttron_installer.modules.global_configs import find_dict_index
 
 _log = logging.getLogger(__name__)
 
@@ -15,6 +16,7 @@ import string
 
 from volttron_installer.views import agent_setup, hosts_tab, global_config_store
 from volttron_installer.components.platform_tile import platform_tile_container
+from volttron_installer.modules.global_configs import platforms
 from volttron_installer.components.background import gradial_background
 from volttron_installer.components.platform_tile import PlatformTile
 from volttron_installer.components.platform_components.platform import Platform, ObjectCommunicator
@@ -42,6 +44,16 @@ def numerate_amount_of_platforms() -> str:
 
 def home_view(page: Page) -> View:
     from volttron_installer.views import InstallerViews as vi_views
+
+    def refresh_platforms() -> None:
+        for uid in platforms.keys(): #.keys()
+            working_var = platforms[uid] # platforms json dump var
+            event_bus = ObjectCommunicator()
+            init_platform = Platform(working_var["name"], page, event_bus, global_event_bus)
+            init_platform.added_hosts = working_var["host"]
+            init_platform.address= working_var["address"]
+            init_platform.added_agents = working_var["agents"]
+        pass
 
     def add_platform_tile(e) -> None:
         # Creates a single instance of ObjectCommunicator to be used throughout the whole platform
@@ -94,7 +106,7 @@ def home_view(page: Page) -> View:
                 )
             ),
             Tab(
-                text="Config Store Manager",
+                text="Config Store Templates",
                 content=config_store_tab
             )
         ],

@@ -1,13 +1,13 @@
 """
 Example:
 
-global agents = [
+global agents: list[dict] = [
                     {       
                         'agent_name' : 'ListenerAgent' 
-                        'agent_configuration' : {'key' : 'value'},
+                        'agent_configuration' : {'key' : 'value'}, #JSON
                         'default_identity' : 'Listener',
                         'agent_path' : '/path/to/identity.file',
-                        '' : ''
+                        'config_entries' : ['config', 'config2']
                     }
                 ]
 
@@ -37,11 +37,26 @@ global_hosts = dump_to_var("hosts")
 # Establishing drivers.json into global_drivers
 global_drivers = dump_to_var("drivers")
 
+agent_specific_configs = dump_to_var("agent_specific_configs")
+"""
+{
+    platform_uid : {
+        agent_name : blah,
+        driver : {
+                    driver: stuff 
+                    }
+    },
+}
+"""
+platforms: dict = dump_to_var("platforms")
+
+
+
 def find_dict_index(lst: list[dict], name):
     """
     Finds the index of the dictionary containing the specified name in a list of dictionaries.
     The name must match the value of the first item in each dictionary as it is designed to hold
-    the name (lst[x][0] will always = host_id/agent_name).
+    the name (lst[x][0] will always = host_id/agent_name/name(drivers)).
 
     Args:
         lst: A list of dictionaries, where each dictionary represents an item.

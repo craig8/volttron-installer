@@ -5,8 +5,8 @@ Module to manage the platform configuration in a platform management application
 from flet import *
 from volttron_installer.components.platform_components.platform import Platform
 from volttron_installer.components.agent import Agent
+from volttron_installer.modules.attempt_to_update_control import attempt_to_update_control
 from volttron_installer.modules.create_field_methods import field_pair, divide_fields
-from volttron_installer.modules.global_configs import global_agents, global_hosts
 from volttron_installer.modules.populate_dropdowns import numerate_host_dropdown, numerate_agent_dropdown
 
 
@@ -43,6 +43,7 @@ class PlatformConfig:
         # Initialize the shared instance
         self.platform = shared_instance
         self.platform.event_bus.subscribe("update_global_ui", self.update_platform_config_ui)
+        self.platform.event_bus.subscribe("remove_agent", self.remove_agent)
 
         # Name field initialization
         self.name_field = TextField(hint_text="Only letters, numbers, and underscores are allowed.")
@@ -127,6 +128,7 @@ class PlatformConfig:
         new_host_field = numerate_host_dropdown()
         self.host_field_pair.content.controls[1].content = new_host_field  # Update the host field with new host values
         self.host_field = new_host_field
+        attempt_to_update_control(self.host_field)
 
     def validate_text(self, text_field: TextField) -> None:
         """
@@ -153,13 +155,18 @@ class PlatformConfig:
             e: The event object.
         """
         if self.agent_dropdown.value not in self.platform.added_agents:
-            agent_tile_to_add = Agent(self.agent_dropdown.value, self.platform_config_agent_column, self.agent_config_column, self.platform.added_agents)
+            agent_tile_to_add = Agent(self.platform, self.agent_dropdown.value, self.platform_config_agent_column, self.agent_config_column, self.platform.added_agents)
             self.platform_config_agent_column.controls.append(agent_tile_to_add.build_agent_card())
             self.platform.added_agents[self.agent_dropdown.value] = [agent_tile_to_add, False]  # False because there isn't any custom JSON
             self.platform_config_agent_column.update()
 
             # Tell Agent Config to update their row 
             self.platform.event_bus.publish("append_agent_row", "self.append_agent_row()")
+
+    def remove_agent(self, container) -> None:
+        
+        pass
+
 
     def platform_config_view(self) -> Container:
         """

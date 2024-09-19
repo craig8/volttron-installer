@@ -2,6 +2,7 @@ from flet import TextField, IconButton, colors
 import csv
 import io
 import json
+import yaml
 
 def validate_text(text_field: TextField, submit_button: IconButton) -> None:
     """
@@ -79,4 +80,13 @@ def check_csv_field(field: TextField) -> bool:
         field.border_color = colors.RED_800
         field.color = colors.RED_800
         field.update()
+        return False
+    
+def check_yaml_field(yaml_string) -> None:
+    try:
+        yaml.safe_load(yaml_string)
+        print("calm yaml")
+        return True
+    except yaml.YAMLError:
+        print("HE LYIN")
         return False

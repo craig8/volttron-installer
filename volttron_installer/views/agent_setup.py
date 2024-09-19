@@ -8,7 +8,8 @@ from volttron_installer.modules.styles import modal_styles2
 from dataclasses import dataclass, field
 from volttron_installer.modules.populate_dropdowns import numerate_configs_dropdown
 import json
-# Checklist: update JSON validator to include the global JSON validator module
+# Checklist: update JSON validator to include the global JSON validator module,
+#            Update tab to include checks for added config store entries
 
 
 key_constructor =[
@@ -65,7 +66,7 @@ class AgentForm(BaseForm):
                                         OutlinedButton(on_click=lambda e: self.page.close(self.modal),
                                                     content=Text("Cancel", color="red")),
                                         OutlinedButton(on_click=self.save_config_store_entries, 
-                                                       text="Save")
+                                                       text="Add")
                                     ],
                                     alignment=MainAxisAlignment.SPACE_BETWEEN
                                 )
@@ -88,7 +89,7 @@ class AgentForm(BaseForm):
             "Default Identity" : self.default_identity_field,
             "Agent Path" : self.agent_path_field,
             "Agent Configuration" : self.agent_configuration_field,
-            "Config Store Entries" : OutlinedButton(text="Edit", on_click=lambda e: self.page.open(self.modal)),
+            "Config Store Entries" : OutlinedButton(text="Add", on_click=lambda e: self.page.open(self.modal)),
         }
 
         super().__init__(page, form_fields)
@@ -109,6 +110,7 @@ class AgentForm(BaseForm):
 
     def save_config_store_entries(self, e) -> None:
         self.added_config_store_entries.append(self.config_dropdown.value)
+        print(self.added_config_store_entries)
 
     def update_ui(self, var = None)-> None:
         print("agent_setup.py has received `update_global_ui`")

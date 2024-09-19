@@ -247,7 +247,7 @@ class ConfigForm(BaseForm):
         attempt_to_update_control(self.content_input_container)
 
 
-    def clean_json_string(self, json_string: str) -> dict:
+    def clean_json_string(self, json_string: str) -> str:
         parced_string = json_string.replace("\r", "").replace("\\", "").replace("\n" , "").replace(" ", "")
         try:
             decoded_string = json.loads(parced_string)
