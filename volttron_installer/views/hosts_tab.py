@@ -1,9 +1,10 @@
+from email_validator import GLOBALLY_DELIVERABLE
 from volttron_installer.components.base_tile import BaseForm, BaseTab, BaseTile
 from flet import *
 from volttron_installer.modules.global_configs import global_hosts, find_dict_index
 from volttron_installer.modules.global_event_bus import global_event_bus
 from dataclasses import dataclass, field
-import json
+import asyncio
 
 key_constructor =[
     "host_id",
@@ -49,28 +50,36 @@ class HostForm(BaseForm):
         self.host: Host = host
         self.json_validity = True
 
-    def save_config(self, e) -> None:
+    async def save_config(self, e) -> None:
+        old_name = self.host.host_id
+
+        check_overwrite: bool | None = await self.detect_conflict(global_hosts, self.host_id_field.value, self.host.host_id)
+
+        if check_overwrite == True:
+            global_event_bus.publish("soft_remove", self.host.tile.key)
+        elif check_overwrite == False:
+            return
+
         # Save field values to host attributes
         self.host.ssh_sudo_user = self.ssh_sudo_user_field.value
         self.host.identity_file = self.identity_file_field.value
         self.host.ssh_ip_address = self.ssh_ip_address_field.value
         self.host.ssh_port = self.ssh_port_field.value
 
-        # Save old name to a variable so we can see if it was originally in global_hosts
-        old_name = self.host.host_id
-        index = find_dict_index(global_hosts, old_name)
-
         # Now we can reassign new name
         self.host.host_id = self.host_id_field.value
 
-        if index is not None:
-            for key, val in zip(key_constructor, self.val_constructor):
-                global_hosts[index][key] = val.value
-        else:
-            host_dictionary_appendable = {}
-            for key, val in zip(key_constructor, self.val_constructor):
-                host_dictionary_appendable[key] = val.value
-            global_hosts.append(host_dictionary_appendable)
+        dictionary_appendable = {
+            "ssh_sudo_user" : self.host.ssh_sudo_user,
+            "identity_file" : self.host.identity_file,
+            "ssh_ip_address": self.host.ssh_ip_address,
+            "ssh_port": self.host.ssh_port
+        }
+
+        if check_overwrite == "rename":
+            self.replace_key(global_hosts, old_key=old_name, new_key=self.host.host_id)
+        
+        global_hosts[self.host.host_id] = dictionary_appendable
 
         self.host.tile.content.controls[0].value = self.host.host_id
         self.page.update()

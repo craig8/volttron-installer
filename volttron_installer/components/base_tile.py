@@ -7,6 +7,8 @@ from volttron_installer.modules.remove_from_controls import remove_from_selectio
 from volttron_installer.modules.attempt_to_update_control import attempt_to_update_control
 from flet import *
 from dataclasses import fields
+import asyncio
+from volttron_installer.modules.styles import modal_styles2
 
 class BaseTile:
     counter = dump_to_var("tile_id")
@@ -37,6 +39,8 @@ class BaseForm:
         self.non_fields = []
         self.additional_content = [] # for anything special
 
+        self.overwrite: bool = False
+
         for key, field in self.form_fields.items():
             if isinstance(field, TextField):
                 self.val_constructor.append(field)
@@ -54,6 +58,7 @@ class BaseForm:
                 *self.additional_content
             ]
         )
+
     def classify_field(self, field):
         if hasattr(field, "key"):
             if field.key == "pass":
@@ -73,7 +78,7 @@ class BaseForm:
         self.page.update()
 
     def create_fields(self) -> list:
-        """Pairs fields up with title then returns divided up field pairs"""
+        """Pairs fields up with title then returns divided up field pairs."""
         field_pairs = []
         try:
             for obj, key in zip(self.val_constructor, self.form_fields.keys()):
@@ -93,7 +98,7 @@ class BaseForm:
         valid: bool = all(field.value for field in self.val_constructor)
         self.toggle_submit_button(valid)
 
-    def save_config(self, e) -> None:
+    async def save_config(self, e) -> None:
         # This method will be overwritten
         pass
 
@@ -103,7 +108,70 @@ class BaseForm:
 
     def write_to_file(self, file: str, global_lst: list):
         write_to_file(file, global_lst)
+    
+    def replace_key(self, dictionary: dict, old_key: str, new_key: str):
+        if old_key in dictionary:
+            dictionary[new_key] = dictionary.pop(old_key)
+            
+    async def warning_modal(self, new_name: str) -> bool:
+        loop = asyncio.get_event_loop()
 
+        def no_overwrite(e):
+            self.page.close(modal)
+            self.overwrite = False
+            loop.call_soon_threadsafe(future.set_result, False)
+
+        def enable_overwrite(e):
+            self.page.close(modal)
+            self.overwrite = True
+            loop.call_soon_threadsafe(future.set_result, True)
+
+        modal_content = Column(
+            alignment= alignment.center,
+            controls=[
+                Text("WARNING!", color="red", size=22),
+                Text(f"You're about to overwrite a configuration named: {new_name}", size=18),
+                Row(
+                    alignment=MainAxisAlignment.SPACE_AROUND,
+                    controls=[
+                        OutlinedButton(content=Text("Cancel", color="red"), on_click=no_overwrite),
+                        OutlinedButton(text="Overwrite", on_click=enable_overwrite)
+                    ]
+                )
+            ]
+        )
+
+        modal = AlertDialog(
+            modal=False,
+            bgcolor="#00000000",
+            content=Container(
+                **modal_styles2(),
+                width=400,
+                height=170,
+                content=modal_content
+            )
+        )
+
+        # Create a future for the result
+        future = loop.create_future()
+        self.page.open(modal)
+        await future
+        return self.overwrite
+
+    async def detect_conflict(self, working_dict: dict, item: str, old_name: str) -> bool | None | str:
+        if old_name != item:
+            return "rename" # We are just renaming the configuration, so we can return
+        
+        working_list = working_dict.keys()
+        if item in working_list:
+            overwrite_decision = await self.warning_modal(item)
+            if overwrite_decision:
+                return True
+            else:
+                return False
+        else:
+            return None # item was not found.
+                
     def build_form(self) -> Column:
         return self._form
 
@@ -172,28 +240,31 @@ class BaseTab:
             )
         )
         return tab_view
-        
-    def refresh_tiles(self, file_name: str, global_list: list[dict], instance_cls: object, instance_form_cls: object):
-        if self.contains_container() == False:
-            for item in global_list:
-                instance_cls_field = fields(instance_cls)
-                instance_cls_attributes = [attribute.name for attribute in instance_cls_field]
-                instance_constructor = {}
-                for attribute, key in zip(item, instance_cls_attributes):
-                    instance_constructor[key] = item[key]
-    
-                # Create instance with our constructor
+ 
+    def refresh_tiles(self, file_name: str, global_dict: dict, instance_cls: type, instance_form_cls: type):
+        if not self.contains_container():  # Checking if the container exists
+            for key, item in global_dict.items():
+                instance_cls_fields = fields(instance_cls)
+                instance_cls_attributes = [attribute.name for attribute in instance_cls_fields if attribute.init]  # Only include attributes marked with init=True
+
+                # Ensure the first attribute in 'instance_cls_attributes' gets the key's value
+                instance_constructor = {attr: item.get(attr) for attr in instance_cls_attributes}
+                if instance_cls_attributes:  # Ensure there is at least one attribute
+                    first_attr = instance_cls_attributes[0]
+                    instance_constructor[first_attr] = key
+
+                # Create the instance with the constructor
                 instance = instance_cls(**instance_constructor)
-                
-                # Create a new field out of our new instance, extract instance_tile
-                instance_fields = fields(instance)
-                instance_values = [getattr(instance, field_object.name) for field_object in instance_fields]
+
+                # Extract instance_tile from the new instance
+                instance_values = [getattr(instance, field.name) for field in instance_cls_fields]
                 instance_tile: Container = instance_values[-1]
 
-                # Create form with our new instance
+                # Create the form with the new instance
                 form: BaseForm = instance_form_cls(instance, self.page)
 
-                self.configure_new_instance(file_name, global_list, instance_values, instance_tile, form, instance)
+                # Configure the new instance
+                self.configure_new_instance(file_name, global_dict, instance_values, instance_tile, form, instance)
 
     def add_new_tile(self, global_list, file_name: str, object: BaseTile, form: BaseForm):
         field_objects = fields(object)
@@ -235,13 +306,10 @@ class BaseTab:
         self.tab.content.controls[2].content = Column(expand=3)
         self.page.update()
     
-    def remove_self(self, global_lst: list, file_name: str, instance_attributes: dict):
-        index = find_dict_index(global_lst, instance_attributes["name"])
-        if index is not None:
-            global_lst.pop(index)
-            write_to_file(file_name, global_lst)
-        else:
-            print("The instance you are trying to remove hasn't been properly registered yet. It has been removed")
+    def remove_self(self, global_lst: dict, file_name: str, instance_attributes: dict):
+        if instance_attributes["name"] in global_lst.keys():
+            del global_lst[instance_attributes["name"]]
+        write_to_file(file_name, global_lst)
         remove_from_selection(self.instance_tile_column, instance_attributes["id"])
         self.tab.content.controls[2].content = Column(expand=3)
         self.page.update()

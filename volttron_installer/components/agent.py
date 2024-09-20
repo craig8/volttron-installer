@@ -2,6 +2,7 @@ from flet import *
 import flet as ft
 import json
 import yaml
+from volttron_installer.components import error_modal
 from volttron_installer.components.platform_components.platform import Platform
 from volttron_installer.modules.remove_from_controls import remove_from_selection
 from volttron_installer.modules.styles import modal_styles2
@@ -26,7 +27,7 @@ class Agent:
 
         self.label = Text(value=self.agent_name, color=self.get_agent_color())
         self.input_json_field = TextField(multiline=True, label="Input Custom JSON or YAML")
-        self.error_message = Text(value="", color="red")
+        self.error_message: Text = Text(value="", color="red")
         
         # View agent instances to give correct keys to specific components
         self.agent_id = Agent.counter
@@ -59,7 +60,7 @@ class Agent:
                         content=Column(
                             [
                                 self.input_json_field,
-                                OutlinedButton(text="Save", on_click=self.check_yaml_submit)
+                                OutlinedButton(text="Save", on_click=self.check_config_submit)
                             ]
                         )
                     ),
@@ -67,33 +68,20 @@ class Agent:
                 ]
             )
         )
-        self.error_modal = AlertDialog(
-            modal = False,
-            content=Container(
-                **modal_styles2(),
-                height=150,
-                content=Column(
-                    [
-                        Text("ERROR", size=22, color="red",),
-                        Text(f"{self.error_message}"),
-                        Text("Your custom configuration has not saved")
-                    ]
-                )
-            )
-        )
         self.agent_row = self.build_agent_row()
 
 
     def check_config_submit(self, e):
         custom_config: str = self.input_json_field.value
-        if check_json_field(self.input_json_field):
+        if check_yaml_field(self.input_json_field):
             self.custom_config = custom_config
             pass
         elif check_json_field(self.input_json_field):
             self.custom_config = custom_config
             pass
         else:
-            self.platform.page.open(self.error_modal)
+            self.platform.page.open(error_modal.error_modal())
+            self.error_message.value = "Improper JSON or YAML was submitted, please try again"
             return
 
 

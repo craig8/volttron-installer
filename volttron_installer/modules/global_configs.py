@@ -29,15 +29,15 @@ to the new change.
 from volttron_installer.modules.write_to_json import dump_to_var
 
 # Establishing agents.json into global_agents
-global_agents = dump_to_var("agents")
+global_agents: dict = dump_to_var("agents")
 
 # Establishing agents.json into global_hosts
-global_hosts = dump_to_var("hosts")
+global_hosts: dict = dump_to_var("hosts")
 
 # Establishing drivers.json into global_drivers
-global_drivers = dump_to_var("drivers")
+global_drivers: dict = dump_to_var("drivers")
 
-agent_specific_configs = dump_to_var("agent_specific_configs")
+agent_specific_configs: dict = dump_to_var("agent_specific_configs")
 """
 {
     platform_uid : {

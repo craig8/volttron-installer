@@ -2,15 +2,14 @@ from volttron_installer.components.base_tile import BaseForm, BaseTab, BaseTile
 from flet import *
 from volttron_installer.modules.attempt_to_update_control import attempt_to_update_control
 from volttron_installer.modules.clean_json_string import clean_json_string
-from volttron_installer.modules.global_configs import global_agents, find_dict_index
+from volttron_installer.modules.global_configs import global_agents, global_drivers
 from volttron_installer.modules.global_event_bus import global_event_bus
+from volttron_installer.modules.remove_from_controls import remove_from_selection
 from volttron_installer.modules.styles import modal_styles2
 from dataclasses import dataclass, field
 from volttron_installer.modules.populate_dropdowns import numerate_configs_dropdown
-import json
-# Checklist: update JSON validator to include the global JSON validator module,
-#            Update tab to include checks for added config store entries
-
+from volttron_installer.modules.validate_field import check_yaml_field, check_json_field
+from volttron_installer.components.error_modal import error_modal
 
 key_constructor =[
     "agent_name",
@@ -41,7 +40,7 @@ class AgentForm(BaseForm):
         self.agent_name_field = TextField(on_change=self.validate_fields)
         self.default_identity_field = TextField(on_change=self.validate_fields)
         self.agent_path_field = TextField(on_change=self.validate_fields)
-        self.agent_configuration_field = TextField(on_change=lambda e: self.check_json_field(e, self.agent_configuration_field))
+        self.agent_configuration_field = TextField(hint_text="Input custom YAML or JSON", on_change=self.validate_fields, multiline=True)
         
         global_event_bus.subscribe("update_global_ui", self.update_ui)
 
@@ -73,6 +72,7 @@ class AgentForm(BaseForm):
                             )
                         ]
                     )
+        
         self.modal = AlertDialog(
                         modal = False,
                         bgcolor="#00000000",
@@ -84,100 +84,119 @@ class AgentForm(BaseForm):
                         )
                     )
 
+        self.added_config_entries_container = Container(
+            margin=4,
+            border_radius= 7,
+            padding=5, 
+            key="pass",
+            expand=True,
+            bgcolor=colors.with_opacity(0.45, "black"),
+            content=Column(
+                [
+                    Text("Total Entries:")
+                ],
+                scroll=ScrollMode.AUTO
+            )
+        )
+
         form_fields = {
             "Name" : self.agent_name_field,
             "Default Identity" : self.default_identity_field,
             "Agent Path" : self.agent_path_field,
             "Agent Configuration" : self.agent_configuration_field,
             "Config Store Entries" : OutlinedButton(text="Add", on_click=lambda e: self.page.open(self.modal)),
+            "store entries container" : self.added_config_entries_container
         }
 
         super().__init__(page, form_fields)
         self.agent: Agent = agent
-        self.json_validity = True
-        self.added_config_store_entries = []
+        self.custom_config = self.agent.agent_configuration
+        self.agent_config_validity = True
+        self.agent_config_type: str | "YAML" | "JSON" = ""
+        self.added_config_store_entries = {}
  
-    """
-    self.added_config_store_entries = [
-                                        {name:type}
-                                      ]
-    a = {'configs : [
-                        {name: type},
-                        {name:type}
-                    ]
-        }
-    """
-
     def save_config_store_entries(self, e) -> None:
-        self.added_config_store_entries.append(self.config_dropdown.value)
-        print(self.added_config_store_entries)
+        if self.config_dropdown.value not in self.added_config_store_entries:
+            self.added_config_store_entries[self.config_dropdown.value] = global_drivers[self.config_dropdown.value]
+            self.added_config_entries_container.content.controls.append(self.create_added_entry_tile(self.config_dropdown.value))
+        attempt_to_update_control(self.added_config_entries_container)
+        self.page.close(self.modal)
 
     def update_ui(self, var = None)-> None:
-        print("agent_setup.py has received `update_global_ui`")
         self.config_dropdown = numerate_configs_dropdown()
         attempt_to_update_control(self.config_dropdown)
+
+    def create_added_entry_tile(self, title: str) -> Container:
+        tile_instance = BaseTile(title=title)
+        tile = tile_instance.build_tile()
+        tile.content.controls[1].on_click = lambda e: self.remove_from_added_entries(title, id=tile.key)
+        return tile
+
+    def remove_from_added_entries(self, title: str, id: str) -> None:
+        del self.added_config_store_entries[title]
+        remove_from_selection(self.added_config_entries_container.content, id)
 
     def validate_fields(self, e) -> None:
         # Implement field validation logic and toggle submit button state.
         fields = [self.form_fields[i] for i in self.form_fields.keys() if isinstance(self.form_fields[i], TextField)]
         valid = all(field.value for field in fields)
-        if self.json_validity == False:
+
+        if self.agent_config_validity == False:
             self.toggle_submit_button(False)
         else:
             self.toggle_submit_button(valid)
 
-    def save_config(self, e) -> None:
+    def check_agent_config_field(self) -> bool:
+        custom_config: str = self.agent_configuration_field.value
+        if check_yaml_field(self.agent_configuration_field):
+            self.custom_config = custom_config
+            self.agent_config_type = "YAML"
+            return True
+        elif check_json_field(self.agent_configuration_field):
+            self.custom_config = custom_config
+            self.agent_config_type = "JSON"
+            return True
+        else:
+            self.page.open(error_modal())
+            return False
+        
+    async def save_config(self, e) -> None:
+        valid_config = self.check_agent_config_field()
+        if valid_config == False:
+            return
+
+        old_name = self.agent.agent_name
+
+        check_overwrite: bool | None = await self.detect_conflict(global_agents, self.agent_name_field.value, self.agent.agent_name)
+
+        if check_overwrite == True:
+            global_event_bus.publish("soft_remove", self.agent.tile.key)
+
+        elif check_overwrite == False:
+            return
+
         # Save field values to agent attributes
         self.agent.default_identity = self.default_identity_field.value
         self.agent.agent_path = self.agent_path_field.value
         self.agent.agent_configuration = clean_json_string(self.agent_configuration_field.value)
-
-        # Save old name to a variable so we can see if it was originally in global_agents
-        old_name = self.agent.agent_name
-        index = find_dict_index(global_agents, old_name)
-
-        # Now we can reassign new name
         self.agent.agent_name = self.agent_name_field.value
 
-        if index is not None:
-            for key, val in zip(key_constructor, self.val_constructor):
-                global_agents[index][key] = val.value
-        else:
-            agent_dictionary_appendable = {}
-            for key, val in zip(key_constructor, self.val_constructor):
-                agent_dictionary_appendable[key] = val.value
-            global_agents.append(agent_dictionary_appendable)
+        dictionary_appendable = {
+            "default_identity" : self.agent.default_identity,
+            "agent_path" : self.agent.agent_path,
+            "agent_configuration" : self.agent.agent_configuration if self.agent_config_type == "YAML" else eval(self.agent.agent_configuration),
+            "config_store_entries" : self.added_config_store_entries
+        }
+
+        if check_overwrite == "rename":
+            self.replace_key(global_agents, old_key=old_name, new_key=self.agent.agent_name)
+        global_agents[self.agent.agent_name] = dictionary_appendable
 
         self.agent.tile.content.controls[0].value = self.agent.agent_name
         attempt_to_update_control(self.page)
         self.write_to_file("agents", global_agents)
         update_global_ui()
 
-    def check_json_field(self, e, field: TextField) -> None:
-        """
-        Validates the JSON input in a text field.
-
-        Args:
-            field (TextField): The text field containing JSON input.
-        """
-        custom_json = field.value
-        if custom_json == "" or None or " ":
-            field.border_color = "black"
-            attempt_to_update_control(field)
-            self.json_validity = True
-        try:
-            json.loads(custom_json)
-            field.border_color = colors.GREEN
-            field.color = "white"
-            attempt_to_update_control(field)
-            self.json_validity = True
-        except json.JSONDecodeError:
-            field.border_color = colors.RED_800
-            field.color = colors.RED_800
-            attempt_to_update_control(field)
-            self.json_validity = False
-        self.validate_fields(e= e)
-        
 class AgentSetupTab(BaseTab):
     def __init__(self, page: Page) -> None:
         self.list_of_agents = Column(

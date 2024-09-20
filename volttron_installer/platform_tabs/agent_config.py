@@ -3,7 +3,7 @@ from volttron_installer.components.agent import Agent
 from volttron_installer.components.platform_components.platform import Platform
 from volttron_installer.modules.populate_dropdowns import numerate_agent_dropdown
 from volttron_installer.modules.global_configs import agent_specific_configs, global_agents
-from volttron_installer.platform_tabs import agency
+from volttron_installer.platform_tabs import local_config_store
 from volttron_installer.modules.attempt_to_update_control import attempt_to_update_control
 import yaml
 
@@ -87,7 +87,7 @@ class AgentConfig:
     def display_agent_config_store(self, agent: Agent, e) -> None:
         self.configure_agent_view.content = agent.build_agent_configuration()
         self.configure_agent_view.update()
-        agent_specific_config_store = agency.LocalConfigStoreManagerTab(
+        agent_specific_config_store = local_config_store.LocalConfigStoreManagerTab(
                                                 self.platform.page,
                                                 self.platform,
                                                 agent

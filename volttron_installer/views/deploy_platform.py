@@ -115,8 +115,6 @@ def deploy_platform_view(page: Page) -> View:
                 agent_column.controls.append(agent_tile_to_add)
                 page.update()
                 added_agents.append(dd.value)
-                print(added_agents)
-        print(dd.value)
 
     #func to restore the agents after swtiching pages
     def restore_agents():

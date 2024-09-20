@@ -1,1 +1,57 @@
-[{"agent_name": "configued", "default_identity": "f", "agent_path": "h", "agent_configuration": "{\"A\":\"A\"}"}, {"agent_name": "zaka", "default_identity": "voltteon", "agent_path": "the/only/path", "agent_configuration": "{\"A\":\"A\"}"}]
+{
+    "zaka": {
+        "default_identity": "voltteon",
+        "agent_path": "the/only/path",
+        "agent_configuration": {
+            "A": "A"
+        },
+        "config_store_entries": {}
+
+    },
+    "configued": {
+        "default_identity": "f",
+        "agent_path": "h",
+        "agent_configuration": {
+            "A": "A"
+        },
+        "config_store_entries": {}
+    },
+    "changed": {
+        "default_identity": "f",
+        "agent_path": "h",
+        "agent_configuration": {
+            "A": "A"
+        },
+        "config_store_entries": {}
+    },
+    "vbnvbnv": {
+        "default_identity": "aa",
+        "agent_path": "aao0",
+        "agent_configuration": "employees:-name:Alicedepartment:Engineeringskills:-Python-JavaScript-name:Bobdepartment:Salesskills:-Communication-Negotiation",
+        "config_store_entries": {}
+    },
+    "hiopphpoibn": {
+        "default_identity": "ggg",
+        "agent_path": "gggs",
+        "agent_configuration": {
+            "gg": "ggg"
+        },
+        "config_store_entries": {
+            "do we rlly love csv though": {
+                "type": "JSON",
+                "content": {
+                    "get": "overwritten",
+                    "haha": "nerd"
+                }
+            },
+            "we love csv": {
+                "type": "JSON",
+                "content": {
+                    "we": "yes",
+                    "love": "we",
+                    "CSV": "do"
+                }
+            }
+        }
+    }
+}

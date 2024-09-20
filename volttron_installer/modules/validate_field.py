@@ -82,10 +82,14 @@ def check_csv_field(field: TextField) -> bool:
         field.update()
         return False
     
-def check_yaml_field(yaml_string) -> None:
+def check_yaml_field(yaml_field: TextField) -> None:
+    yaml_string: str = yaml_field.value
     try:
         yaml.safe_load(yaml_string)
         print("calm yaml")
+        yaml_field.border_color = colors.GREEN
+        yaml_field.color = "white"
+        yaml_field.update()
         return True
     except yaml.YAMLError:
         print("HE LYIN")

@@ -36,7 +36,8 @@ def generate_URL() -> str:
         generated_url = f"/{new_url}"
         if generated_url not in platforms_added:
             platforms_added.append(generated_url)
-            return generated_url
+            return "/h8NU5I1" # HARD-CODING FOR TESTING
+            #return generated_url
 
 def numerate_amount_of_platforms() -> str:
     platform_number = len(platforms_added)
@@ -53,7 +54,6 @@ def home_view(page: Page) -> View:
             init_platform.added_hosts = working_var["host"]
             init_platform.address= working_var["address"]
             init_platform.added_agents = working_var["agents"]
-        pass
 
     def add_platform_tile(e) -> None:
         # Creates a single instance of ObjectCommunicator to be used throughout the whole platform

@@ -16,7 +16,7 @@ import asyncio
 # PLAN: MAKE CONTENT FIELD BE PARCED AND FORM THE DATATABLE BASED OFF OF IT AND HAVE ERROR HANDLING IF IMPROPER
 # CONTENT WAS PASTED IN
 # REWRITE DATATABLE STRUCTURE
-# CREATE FUNCTION THAT UPDATES BOTH FIELDS, THAT FORMATS THE JSON FIELD ASWELL BUT IGNORES THE SPACES TEEHEE
+# CREATE FUNCTION THAT UPDATES BOTH FIELDS, THAT FORMATS THE json FIELD ASWELL BUT IGNORES THE SPACES TEEHEE
 
 # GO TO THIRD TO FIRST AND SCROLL UP FOR OLD COLUMN AND ROW CODE 
 
@@ -31,7 +31,7 @@ key_constructor = [
 class Config(BaseTile):
     name: str
     content: str
-    type: str  # CSV or JSON
+    type: str  # csv or json
 
     tile: Container = field(init=False)
 
@@ -113,14 +113,13 @@ class ConfigForm(BaseForm):
         self.submit: bool = False
         self.content_validity: bool= False
 
-        self.overwrite: bool = False
-        self.content_value: str = self.config.content if isinstance(self.config.content, str) else ""
+        self.content_value: dict | str = self.config.content
         self.detected_content_format: str = self.config.type
         self.__post_init__()
 
     def __post_init__(self) -> None:
         if self.config_mode == "JSON":
-            self.json_content_editor.value = prettify_json(self.content_value)
+            self.json_content_editor.value = prettify_json(json.dumps(self.content_value))
             attempt_to_update_control(self.json_content_editor)
         else:
             self.load_csv_to_data_table(self.content_value)
@@ -246,7 +245,6 @@ class ConfigForm(BaseForm):
             self.content_input_container.content = Container(expand=True, content=self.csv_data_table)
         attempt_to_update_control(self.content_input_container)
 
-
     def clean_json_string(self, json_string: str) -> str:
         parced_string = json_string.replace("\r", "").replace("\\", "").replace("\n" , "").replace(" ", "")
         try:
@@ -279,10 +277,10 @@ class ConfigForm(BaseForm):
                 return False
 
     def type_change(self, e):
-        # This means if our OLD type was JSON
+        # This means if our OLD type was json
         if self.config_mode == "JSON":
            self.content_value = self.clean_json_string(self.json_content_editor.value)
-        # Was our OLD type CSV?
+        # Was our OLD type csv?
         elif self.config_mode == "CSV":
             self.content_value = self.data_table_to_csv()
         
@@ -294,62 +292,13 @@ class ConfigForm(BaseForm):
         self.update_fields(None)
         self.validate_fields(e)
 
-    async def warning_modal(self, new_name: str) -> bool:
-        loop = asyncio.get_event_loop()
-
-        def no_overwrite(e):
-            self.page.close(modal)
-            self.overwrite = False
-            loop.call_soon_threadsafe(future.set_result, False)
-
-        def enable_overwrite(e):
-            self.page.close(modal)
-            self.overwrite = True
-            loop.call_soon_threadsafe(future.set_result, True)
-
-        modal_content = Column(
-            alignment= alignment.center,
-            controls=[
-                Text("WARNING!", color="red", size=22),
-                Text(f"You're about to overwrite a driver named: {new_name}", size=18),
-                Row(
-                    alignment=MainAxisAlignment.SPACE_AROUND,
-                    controls=[
-                        OutlinedButton(content=Text("Cancel", color="red"), on_click=no_overwrite),
-                        OutlinedButton(text="Overwrite", on_click=enable_overwrite)
-                    ]
-                )
-            ]
-        )
-
-        modal = AlertDialog(
-            modal=False,
-            bgcolor="#00000000",
-            content=Container(
-                **modal_styles2(),
-                width=400,
-                height=170,
-                content=modal_content
-            )
-        )
-
-        # Create a future for the result
-        future = loop.create_future()
-        self.page.open(modal)
-        await future
-        return self.overwrite
-
-
     async def save_config(self, e) -> None:
-        # Update the config object with current values from the fields
-        for config in global_drivers:
-            if config["name"] == self.name_field.value:
-                overwrite_decision = await self.warning_modal(self.name_field.value)
-                if overwrite_decision:
-                    global_event_bus.publish("soft_remove", self.config.tile.key)
-                    break # break out of for loop because user chose to overwrite
-                else:
-                    return  # Cancel saving process if user decides not to overwrite the config
+        check_overwrite: bool | None = await self.detect_conflict(global_drivers, self.name_field.value, self.config.name)
+
+        if check_overwrite == True:
+            global_event_bus.publish("soft_remove", self.config.tile.key)
+        elif check_overwrite == False:
+            return
 
         # If no existing config with the same name, or if user chooses to overwrite
         self.config.type = self.view_type_radio_group.value
@@ -357,32 +306,20 @@ class ConfigForm(BaseForm):
         content_data=self.content_value
         if self.config_mode == "JSON":
             content_data = self.clean_json_string(self.json_content_editor.value)
+            content_data: dict = eval(content_data)
 
         elif self.config_mode == "CSV":
             content_data=self.data_table_to_csv()
 
         self.config.content = content_data
-
-        old_config_name = self.config.name
-        if self.config.name == "Configure Me!":
-            old_config_name = self.name_field.value # if it was a placeholder name, allows newly formed configs to overwrite old configs
-
         self.config.name = self.name_field.value
-        index = find_dict_index(global_drivers, old_config_name)
 
         config_dictionary_appendable = {
-            "name": self.config.name,
-            "type": self.config.type,
-            "content": self.config.content,
-        }
+            "type" : self.config.type,
+            "content" : self.config.content
+            }
 
-        # If an existing entry already exists
-        if index is not None:
-            # Update the existing entry
-            global_drivers[index] = config_dictionary_appendable
-        else:
-            # Add a new entry
-            global_drivers.append(config_dictionary_appendable)
+        global_drivers[self.config.name] = config_dictionary_appendable ## OVERWRITES OLD AND SAVES NEW CONFIGS 
 
         # Update the UI tile content
         self.config.tile.content.controls[0].value = self.config.name
