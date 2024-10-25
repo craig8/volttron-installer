@@ -5,7 +5,7 @@ global agents: list[dict] = [
                     {       
                         'agent_name' : 'ListenerAgent' 
                         'agent_configuration' : {'key' : 'value'}, #JSON
-                        'default_identity' : 'Listener',
+                        'identity' : 'Listener',
                         'agent_path' : '/path/to/identity.file',
                         'config_entries' : ['config', 'config2']
                     }

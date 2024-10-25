@@ -11,5 +11,7 @@ def numerate_host_dropdown() -> Dropdown:
     return Dropdown(options=dropdown_options)
 
 def numerate_configs_dropdown() -> Dropdown:
-    dropdown_options = [dropdown.Option(text=key) for key in global_drivers.keys()]
+    dropdown_options = [dropdown.Option(text="None")]
+    driver_options = [dropdown.Option(text=key) for key in global_drivers.keys()]
+    dropdown_options.extend(driver_options)
     return Dropdown(options=dropdown_options)

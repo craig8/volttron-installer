@@ -7,9 +7,13 @@ These objects should have the following properties:
 """
 
 from flet import *
+from volttron_installer.components.agent import Agent, LocalAgent
+from volttron_installer.modules.attempt_to_update_control import attempt_to_update_control
 from volttron_installer.modules.dynamic_routes import dynamic_routes
+from volttron_installer.modules.global_configs import global_agents
 from volttron_installer.components.background import gradial_background
 from volttron_installer.components.header import Header
+from volttron_installer.platform_tabs import agent_config
 from volttron_installer.platform_tabs.agent_config import AgentConfig
 from volttron_installer.platform_tabs.platform_config import PlatformConfig
 from volttron_installer.components.platform_components.platform import Platform
@@ -29,9 +33,10 @@ class PlatformTile:
         self.platform = shared_instance
 
         # Subscribe to platform events
-        self.platform.event_bus.subscribe("process_data", self.process_data)
-        self.platform.event_bus.subscribe("deploy_all_data", self.process_data)
-        self.platform.event_bus.subscribe("update_global_ui", self.update_global_ui)
+        self.platform.event_bus.subscribe("update_ui", self.update_platform_tile_ui)
+        self.platform.event_bus.subscribe("agent_appended", self.forward_agent_appended)
+        self.platform.event_bus.subscribe("agent_removed", self.forward_agent_removed)
+        self.platform.event_bus.subscribe("load_platform", self.load_agent_ui)
 
         self.home_container = container
         self.platform_tile = self.build_tile()
@@ -39,45 +44,51 @@ class PlatformTile:
         # BUTTON FOR HEADER
         self.submit_button = OutlinedButton("Deploy Platform", disabled=True)
 
-        # AGENT COLUMNS 
-        self.platform_config_agent_column = Column(wrap=True, scroll=ScrollMode.AUTO)
-        self.agent_config_column = Column(
-            expand=3,
-            scroll=ScrollMode.AUTO,
-            alignment=MainAxisAlignment.START,
-            controls=[]
-        )
-
         # Initialize Platform Config tab
         self.platform_config_tab = PlatformConfig(
             self.platform, # passing shared instances
-            self.platform_config_agent_column,
-            self.agent_config_column
         ).platform_config_view()
 
         # Initialize Agent Config tab
         self.agent_config_tab = AgentConfig(
             self.platform,
-            self.platform_config_agent_column,
-            self.agent_config_column
         ).build_agent_config_tab()
 
         # Add route to dynamic routes dynamically
         view = self.platform_view()
         dynamic_routes[self.platform.generated_url] = view
 
-    def update_global_ui(self, data=None):
-        """
-        One day this will update everything for now, its lame.
-        """
-        pass
+    def load_agent_ui(self, data=None):
+        """Subscribed to signal `load_platform`"""
+        agents = self.platform.added_agents.keys()
+        for name in agents:
+            loaded_agent = LocalAgent(
+                agent_name=name,
+                identity=self.platform.added_agents[name]["identity"],
+                agent_path=self.platform.added_agents[name]["agent_path"],
+                agent_configuration=self.platform.added_agents[name]["agent_configuration"],
+                config_store_entries=self.platform.added_agents[name]["config_store_entries"],
+                platform=self.platform
+            )
+            self.platform.event_bus.publish("append_your_agent", loaded_agent)
 
-    def process_data(self, data):
-        """
-        Process data received from subscribed events.
-        """
-        print("platformTile received:", data)
-        eval(data)
+    def forward_agent_removed(self, agent: Agent) -> None:
+        agent_name: str = agent.agent_name
+        del self.platform.added_agents[agent_name]
+        self.platform.event_bus.publish("remove_your_agent", agent)
+
+    def forward_agent_appended(self, agent_name: str) -> None:
+        working_agent: dict = global_agents[agent_name]
+        self.platform.added_agents[agent_name] = global_agents[agent_name]
+        agent = LocalAgent(
+            agent_name=agent_name, 
+            identity=working_agent["identity"], 
+            agent_path=working_agent["agent_path"], 
+            agent_configuration=working_agent["agent_configuration"], 
+            config_store_entries=working_agent["config_store_entries"], 
+            platform=self.platform
+            )
+        self.platform.event_bus.publish("append_your_agent", agent)
 
     def get_background_color(self):
         """
@@ -97,12 +108,12 @@ class PlatformTile:
         """
         return "#00ff00" if self.platform.activity == "ON" else colors.with_opacity(0.65, "#ff0000")
 
-    def update_platform_tile_ui(self):
+    def update_platform_tile_ui(self, e=None):
         """
         Update the UI components of the platform tile based on the current platform state.
         """
-        print("platformTile: updating UI...")
-        print("platformTile: I see activity is: ", self.platform.activity)
+        # print("platformTile: updating UI...")
+        # print("platformTile: I see activity is: ", self.platform.activity)
         # Update UI components based on activity state
         self.platform_tile.bgcolor = self.get_background_color()
         self.platform_tile.content.controls[0].controls[0].value = self.platform.title
@@ -147,7 +158,7 @@ class PlatformTile:
         Build the view for the platform management page.
         """
         # Initializing the header and background
-        header = Header(self.platform, self.submit_button, "/").return_header()
+        header = Header(self.platform, "/").return_header()
         background_gradient = gradial_background()
         return View(
             self.platform.generated_url,

@@ -124,9 +124,9 @@ class ProgressBar:
     #this function will eventually be awesome and be able to communicate with the backend to see if it is actually completed
     def check_if_completed(self, arg) -> bool:
         if arg == 5:
-             print(f"We are on the {arg} iteration, we will stop now.")
+             # print(f"We are on the {arg} iteration, we will stop now.")
              return True
-        print(f"We are on the {arg} iteration, we will keep going.")
+        # print(f"We are on the {arg} iteration, we will keep going.")
         return False
 
     def build_structure(self):

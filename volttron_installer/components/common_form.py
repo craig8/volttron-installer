@@ -37,8 +37,8 @@ class CommonForm:
         if index is not None:
             self.global_list.pop(index)
             self.write_to_file()
-        else:
-            print("The entity you are trying to remove hasn't been properly registered yet.")
+        # else:
+            # # print("The entity you are trying to remove hasn't been properly registered yet.")
         remove_from_selection(self.list_of_entities, self.entity.id_key)
         self.view.content.controls[2] = Column(expand=3)
         self.page.update()
@@ -73,7 +73,7 @@ class Host(CommonEntity):
 @dataclass
 class Agent(CommonEntity):
     agent_name: str
-    default_identity: str
+    identity: str
     agent_path: str
     agent_configuration: str
 

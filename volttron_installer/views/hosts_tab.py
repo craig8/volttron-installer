@@ -53,12 +53,15 @@ class HostForm(BaseForm):
     async def save_config(self, e) -> None:
         old_name = self.host.host_id
 
-        check_overwrite: bool | None = await self.detect_conflict(global_hosts, self.host_id_field.value, self.host.host_id)
 
-        if check_overwrite == True:
-            global_event_bus.publish("soft_remove", self.host.tile.key)
-        elif check_overwrite == False:
-            return
+        if old_name == self.host_id_field.value:
+            check_overwrite="rename"
+        else:  
+            check_overwrite: bool | None = await self.detect_conflict(global_hosts, self.host_id_field.value, self.host.host_id)
+            if check_overwrite == True:
+                global_event_bus.publish("soft_remove", self.host.tile.key)
+            elif check_overwrite == False:
+                return
 
         # Save field values to host attributes
         self.host.ssh_sudo_user = self.ssh_sudo_user_field.value

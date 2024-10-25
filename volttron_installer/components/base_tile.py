@@ -50,7 +50,7 @@ class BaseForm:
         self.submit_button = OutlinedButton(text="Save", disabled=True, on_click=self.save_config)
         self.formatted_fields: any = self.create_fields()
         self._form = Column(
-            #scroll=ScrollMode.ALWAYS,
+            scroll=ScrollMode.AUTO,
             expand=3,
             controls=[
                 *self.formatted_fields,
@@ -90,7 +90,7 @@ class BaseForm:
                     field_pairs.append(field_pair(i, self.form_fields[i]))
             return divide_fields(field_pairs)
         except:
-            print("form_fields contains unhashable kwargs")
+            # # print("form_fields contains unhashable kwargs")
             return None
 
     def validate_fields(self, e) -> None:
@@ -112,7 +112,22 @@ class BaseForm:
     def replace_key(self, dictionary: dict, old_key: str, new_key: str):
         if old_key in dictionary:
             dictionary[new_key] = dictionary.pop(old_key)
-            
+
+    async def check_overwrite(self, old_name: str, working_dict: dict, name: str) -> bool | None | str:
+        check_overwrite = bool | None | str
+        if old_name == name:
+            check_overwrite = "rename"
+        else:
+            check_overwrite= await self.detect_conflict(working_dict, name, old_name)
+            if check_overwrite == True:
+                # Who ever needs to use the will have their own check to see if this function
+                # has returned True, and they'll handle the functionality
+                # global_event_bus.publish("soft_remove", self.object.tile.key)
+                return True
+            elif check_overwrite == False:
+                return False
+        return check_overwrite
+
     async def warning_modal(self, new_name: str) -> bool:
         loop = asyncio.get_event_loop()
 
@@ -192,8 +207,8 @@ class BaseTab:
         self.__post_init__()
 
     def __post_init__(self)->None:
-        pass
         #self.left_instance_column.content.scroll=ScrollMode.ALWAYS
+        pass
 
     def build_base_tab(self):
         # Initialize form container
@@ -285,7 +300,7 @@ class BaseTab:
         self.configure_new_instance(file_name, global_list, new_instance_values, new_tile, new_form, new_instance)
 
     def configure_new_instance(self, file_name: str, global_list: list, instance_values, tile: Container, form: BaseForm, instance):
-        tile.on_click =lambda e: self.show_selected_form(e, form)
+        tile.on_click =lambda e: self.select_tile(e, form)
         tile.content.controls[1].on_click = lambda e: self.remove_self(global_list, file_name, instance_attributes={"name" : instance_values[0], "id" : tile.key})
         self.instance_tile_column.controls.append(tile)
         attempt_to_update_control(self.instance_tile_column)
@@ -315,7 +330,12 @@ class BaseTab:
         self.page.update()
         global_event_bus.publish("update_global_ui", None)
     
+    def select_tile(self, e, instance_form: BaseForm)->None:
+        from volttron_installer.modules.show_selected_tile import show_selected_tile
+        self.show_selected_form(e, instance_form)
+        show_selected_tile(e, self.instance_tile_column)
+        self.page.update()
+
     def show_selected_form(self, e, instance_form: BaseForm) -> None:
         self.tab.content.controls[2].content = instance_form.build_form()
-        self.page.update()
         attempt_to_update_control(self.tab)

@@ -45,9 +45,9 @@ class Agent:
 
     def remove_self(self, e):
         if self.agent_tile in self.parent_container.controls:
-            print("list of added agents in class:",self.agent_list)
+            # print("list of added agents in class:",self.agent_list)
             self.agent_list.remove(self.agent_name)
-            print("list of added agents in class:",self.agent_list)
+            # print("list of added agents in class:",self.agent_list)
             self.parent_container.controls.remove(self.agent_tile)
             self.parent_container.update()  # Update the UI to reflect changes
 
@@ -111,7 +111,7 @@ def deploy_platform_view(page: Page) -> View:
     def add_agent(e)-> None:
         if dd.value != None:
             if dd.value not in added_agents:
-                agent_tile_to_add = Agent(dd.value, agent_column, added_agents).build_agent_card()
+                agent_tile_to_add = Agent(dd.value, agent_column, added_agents).build_agent_tile()
                 agent_column.controls.append(agent_tile_to_add)
                 page.update()
                 added_agents.append(dd.value)
@@ -119,7 +119,7 @@ def deploy_platform_view(page: Page) -> View:
     #func to restore the agents after swtiching pages
     def restore_agents():
         for agent_name in added_agents:
-            agent_tile_to_add = Agent(agent_name, agent_column, added_agents).build_agent_card()
+            agent_tile_to_add = Agent(agent_name, agent_column, added_agents).build_agent_tile()
             agent_column.controls.append(agent_tile_to_add)
 
 

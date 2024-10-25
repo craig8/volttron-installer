@@ -12,7 +12,10 @@ own self.functions() or just interpret the data that have been sent from other m
 """
 
 from flet import Page
-from volttron_installer.modules.global_configs import global_hosts, global_agents
+from volttron_installer.modules.global_configs import global_hosts, global_agents, platforms
+from volttron_installer.modules.write_to_json import write_to_file
+import time
+
 
 class ObjectCommunicator:
     """
@@ -34,7 +37,7 @@ class ObjectCommunicator:
 
     # Define a subscriber function
     def process_data(data):
-        print(f"Received data: {data}")
+        # print(f"Received data: {data}")
 
     # Subscribe to the 'my_event' event type
     communicator.subscribe('my_event', process_data)
@@ -53,7 +56,7 @@ class ObjectCommunicator:
         # { signal : [** list of subscribers' process_data() functions **]}
         self._subscribers = {}
 
-    def subscribe(self, event_type: str, subscriber):
+    def subscribe(self, event_type: str, subscriber: callable):
         """
         Subscribes an object to a specific event type.
 
@@ -91,12 +94,43 @@ class Platform:
         self.added_hosts = {} # host_id : {key:val, key:val}
         self.added_agents = {} # agent name : [agent object, custom JSON (defaults to False if none)]
 # we can use the agent name to parce the agents.json file and get the rest of what we need to deploy
-        
+
+
         self.activity: str = "OFF"  # OFF by default
         self.event_bus: ObjectCommunicator = event_bus  # Initialize the Object communicator for all platform components
+        self.event_bus.subscribe("deploy_platform", self.deploy_platform)
         
         self.global_bus: ObjectCommunicator = global_bus # Initialize global event bus that observes the state of the app
         self.global_bus.subscribe("update_global_ui", self.update_global_ui)
+
+    def load_platform(self):
+        self.event_bus.publish("load_platform")
+
+    def gather_commits(self):
+        self.event_bus.publish("publish_commits")
+
+    def deploy_platform(self, data=None):
+        self.gather_commits()
+        time.sleep(2)
+        # print(f"\n\nDeploying platform with uid of {self.generated_url}")
+        # print(f"Added Host: {self.added_hosts}")
+        # print(f"Name: {self.title}")
+        # print(f"Address: {self.address}")
+        # print(f"Bus Type: {self.bus_type}")
+        # print(f"Ports: {self.ports}")
+        # print(f"Added Agents: {self.added_agents}")
+        
+        dictionary_appendable = {
+            "title" : self.title,
+            "host" : self.added_hosts,
+            "address" : self.address,
+            "bus_type" : self.bus_type,
+            "ports" : self.ports,
+            "agents" : self.added_agents
+        }
+        platforms[self.generated_url] = dictionary_appendable
+        write_to_file("platforms", platforms)
+        # print(platforms)
 
     def update_global_ui(self, data):
         # Now we are working downwards and telling every component to update their UI
@@ -104,4 +138,4 @@ class Platform:
 
     def flip_activity(self) -> None:
         self.activity = "OFF" if self.activity == "ON" else "ON"
-        print(f"Platform: I turned activity to: {self.activity}") # Debug print
+        # print(f"Platform: I turned activity to: {self.activity}") # Debug # print

@@ -4,7 +4,7 @@ from volttron_installer.modules.styles import modal_styles2
 from volttron_installer.modules.global_configs import global_drivers, find_dict_index
 from volttron_installer.modules.validate_field import  check_json_field
 from volttron_installer.modules.global_event_bus import global_event_bus
-from volttron_installer.modules.prettify_json import prettify_json
+from volttron_installer.modules.prettify_string import prettify_json
 from volttron_installer.modules.conversion_methods import json_string_to_csv_string, csv_string_to_json_string, identify_string_format
 from volttron_installer.modules.attempt_to_update_control import attempt_to_update_control
 from dataclasses import dataclass, field
@@ -12,7 +12,7 @@ from volttron_installer.modules.styles import data_table_styles
 import csv
 import io
 import json
-import asyncio
+import time
 # PLAN: MAKE CONTENT FIELD BE PARCED AND FORM THE DATATABLE BASED OFF OF IT AND HAVE ERROR HANDLING IF IMPROPER
 # CONTENT WAS PASTED IN
 # REWRITE DATATABLE STRUCTURE
@@ -66,19 +66,22 @@ class ConfigForm(BaseForm):
                                 multiline=True,
                                 autofocus=True,
                                 height=800,
+                                # width=1500,
                                 border=InputBorder.UNDERLINE,
                                 filled=True,
                                 fill_color=colors.with_opacity(0.5, colors.BLUE_GREY_300),
                                 expand=True,
                                 on_change=self.validate_fields,
+                                text_style=TextStyle(font_family="Consolas")
                             )
         self.content_input_container: Container = Container() # blank container that will have its content plugged in and out depending on type of input field
         
         self.content_container: Container = Container(
             key="pass",
+            border_radius=7,
             bgcolor=colors.with_opacity(0.6, "black"),  # delete later, for formatting reasons
             margin=margin.only(top=15, left=15, right=15),
-            expand=True,
+            #expand=True,
             content=Column(
                 scroll=ScrollMode.AUTO,
                 controls=[
@@ -119,7 +122,10 @@ class ConfigForm(BaseForm):
 
     def __post_init__(self) -> None:
         if self.config_mode == "JSON":
+            # print(f"\n\n For {self.config.name}This is the type of config into tf:\n{type(self.content_value)}\n{type(self.config.content)}")
+            # print(f"this is the actual value: \n{self.content_value}\n{self.config.content}")
             self.json_content_editor.value = prettify_json(json.dumps(self.content_value))
+            # print("\nzawgggg pls save meee:\n", type(self.json_content_editor.value))
             attempt_to_update_control(self.json_content_editor)
         else:
             self.load_csv_to_data_table(self.content_value)
@@ -246,13 +252,17 @@ class ConfigForm(BaseForm):
         attempt_to_update_control(self.content_input_container)
 
     def clean_json_string(self, json_string: str) -> str:
-        parced_string = json_string.replace("\r", "").replace("\\", "").replace("\n" , "").replace(" ", "")
         try:
-            decoded_string = json.loads(parced_string)
-            cleaned_string = json.dumps(decoded_string)
+            # Attempt to parse
+            decoded_string = json.loads(json_string)
+            # Pretty # print to ensure it's well-formatted
+            cleaned_string = json.dumps(decoded_string, indent=4)
+            # print("\ndawg this is my cleaned string:\n", cleaned_string)
             return cleaned_string
-        except:
-            return parced_string
+        except json.JSONDecodeError as e:
+            # # print error for debugging
+            # print(f"JSON Decode Error: {e}")
+            return json_string.strip()
 
     def validate_fields(self, e) -> None:
         fields = [self.form_fields[i].value for i in self.form_fields.keys() if hasattr(self.form_fields[i], 'value')]
@@ -304,11 +314,20 @@ class ConfigForm(BaseForm):
         self.config.type = self.view_type_radio_group.value
         
         content_data=self.content_value
-        if self.config_mode == "JSON":
-            content_data = self.clean_json_string(self.json_content_editor.value)
-            content_data: dict = eval(content_data)
+        try:
+            if self.config_mode == "JSON":
+                content_data = self.clean_json_string(self.json_content_editor.value)
+                
+                # Parse the JSON content using json.loads
+                parsed_data = json.loads(content_data)
+                # print("Parsed Data:", parsed_data)
+                # Continue processing `parsed_data`
+            # Handle other config modes if necessary
+                content_data = parsed_data
+        except json.JSONDecodeError as e:
+            print(f"JSON Decode Error from saving agent specific config in local_config_store.py: {e}")
 
-        elif self.config_mode == "CSV":
+        if self.config_mode == "CSV":
             content_data=self.data_table_to_csv()
 
         self.config.content = content_data
@@ -327,7 +346,8 @@ class ConfigForm(BaseForm):
         
         # Write the changes to file
         self.write_to_file("drivers", global_drivers)
-
+        # print(global_drivers)
+        global_event_bus.publish("added_config_template", None)
 
 class ConfigStoreManagerTab(BaseTab):
     def __init__(self, page: Page) -> None:

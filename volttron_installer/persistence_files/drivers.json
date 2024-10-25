@@ -1,1 +1,60 @@
-{"we love csv": {"type": "JSON", "content": {"we": "yes", "love": "we", "CSV": "do"}}, "do we rlly love csv though": {"type": "JSON", "content": {"get": "overwritten", "haha": "nerd"}}, "pookies": {"type": "JSON", "content": {"LOOKIES": "BOOKIES"}}, "transferer": {"type": "CSV", "content": "aa,tttt,kk\r\naaa,fff,vvv\r\n"}, "aa": {"type": "JSON", "content": {"ohhhyeahh": "thisisit"}}, "bloop": {"type": "CSV", "content": "bllooop,aaaa\r\naaa,zkaa\r\n"}, "sooop": {"type": "CSV", "content": "bllooop,aaaa\r\naaa,zkaa\r\n"}}
+{
+    "driver/foo": {
+        "type": "JSON",
+        "content": {
+            "this": "is",
+            "my": "json",
+            "config": "uration"
+        }
+    },
+    "naticd": {
+        "type": "JSON",
+        "content": {
+            "coudlve": "bencehd"
+        }
+    },
+    "baka": {
+        "type": "JSON",
+        "content": {
+            "dleted": "haha"
+        }
+    },
+    "midlaner": {
+        "type": "CSV",
+        "content": "super,team,gorilla\r\nhans,sama,cadreal\r\n"
+    },
+    "confirmed": {
+        "type": "JSON",
+        "content": {
+            "g2": "keria"
+        }
+    },
+    "riottt?": {
+        "type": "JSON",
+        "content": {
+            "squinting": "riot"
+        }
+    },
+    "meow": {
+        "type": "JSON",
+        "content": {
+            "dleted": "haha"
+        }
+    },
+    "ligma": {
+        "type": "JSON",
+        "content": {
+            "config": {
+                "type": "json",
+                "data": {
+                    "cache_only": false,
+                    "required_target_agents": [
+                        "mongo.analysis",
+                        "crate.analysis"
+                    ]
+                },
+                "modified": "2019-07-26T17:16:52.693576+00:00"
+            }
+        }
+    }
+}

@@ -1,172 +1,85 @@
+from copy import deepcopy
+from dataclasses import dataclass, field
 from flet import *
 import flet as ft
 import json
 import yaml
+from volttron_installer.views.agent_setup import Agent
 from volttron_installer.components import error_modal
 from volttron_installer.components.platform_components.platform import Platform
 from volttron_installer.modules.remove_from_controls import remove_from_selection
 from volttron_installer.modules.styles import modal_styles2
 from volttron_installer.modules.validate_field import check_json_field, check_yaml_field
 
-class Agent:
-    """
-    A class that manages platform wide agent tiles, views, and handles the custom configuration
-    of the agent.
-    """
-    counter = 0
+@dataclass
+class LocalAgent(Agent):
+    platform: Platform
+    
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        self.tile.content.controls[1].on_click = lambda e: self.platform.event_bus.publish("agent_removed", self)
 
-    def __init__(self, shared_instance, agent_name, platform_agent_container, agent_config_container, agent_list):
-        self.platform: Platform = shared_instance
-        self.agent_name = agent_name
-        self.platform_agent_container: Control = platform_agent_container
-        self.agent_config_container: Control = agent_config_container
+    def clone_tile(self) -> None:
+        tile = deepcopy(self.tile)
+        return tile
+    # Same exact dict as shared instance of Platform
+    # NOTE any instance where agent_list is needed, is used by self.platform.added_agents
+    # # aka, useless variable
+    # def agent_config_functionality(self) -> Container:
+    #     def check_config_submit(self, e):
+    #         custom_config: str = self.input_json_field.value
+    #         if check_yaml_field(self.input_json_field):
+    #             self.custom_config = custom_config
+    #             pass
+    #         elif check_json_field(self.input_json_field):
+    #             self.custom_config = custom_config
+    #             pass
+    #         else:
+    #             self.platform.page.open(error_modal.error_modal())
+    #             self.error_message.value = "Improper JSON or YAML was submitted, please try again"
+    #             return
 
-        # Same exact dict as shared instance of Platform
-        self.added_agents = agent_list 
-        self.custom_config = "" # Will be inputed into Platform's added_agents dict
+    #     def check_yaml_submit(self, e) -> None:
+    #         yaml_string: str = self.input_json_field.value
+    #         check_yaml_field(yaml_string)
 
-        self.label = Text(value=self.agent_name, color=self.get_agent_color())
-        self.input_json_field = TextField(multiline=True, label="Input Custom JSON or YAML")
-        self.error_message: Text = Text(value="", color="red")
+    #     label = Text(value=self.agent_name)
+    #     input_json_field = TextField(multiline=True, label="Input Custom JSON or YAML")
+    #     error_message: Text = Text(value="", color="red")
+
+    #     self.agent_row = self.build_agent_tile()
         
-        # View agent instances to give correct keys to specific components
-        self.agent_id = Agent.counter
-        Agent.counter += 1
+    #     # Individualized agent config menu
+    #     agent_configuration_menu = Container(
+    #         padding=5,
+    #         content=Column(
+    #             spacing=60,
+    #             alignment=MainAxisAlignment.START,
+    #             controls=[
+    #                 Row(
+    #                     wrap=True,
+    #                     controls=[
+    #                         Text(self.agent_name, size=24),
+    #                     ]
+    #                 ),
+    #                 Container(
+    #                     content=Column(
+    #                         [
+    #                             input_json_field,
+    #                             OutlinedButton(text="Save", on_click=self.check_config_submit)
+    #                         ]
+    #                     )
+    #                 ),
+    #                 error_message  # Display error message if JSON is invalid
+    #             ]
+    #         )
+    #     )
+    #     return agent_configuration_menu
 
-        # Initialize container with default agent color
-        self.agent_tile = Container(
-            key=f"agent_tile_{self.agent_id}",
-            border_radius=10,
-            padding=5,
-            border=border.all(4, self.get_agent_color()),
-            on_click=self.remove_agent_receiver,
-            content=self.label,
-        )
+    # agent_configuration_menu: Container = field(init=False)
 
-        # Individualized agent config menu
-        self.agent_configuration_menu = Container(
-            padding=5,
-            content=Column(
-                spacing=60,
-                alignment=MainAxisAlignment.START,
-                controls=[
-                    Row(
-                        wrap=True,
-                        controls=[
-                            Text(self.agent_name, size=24),
-                        ]
-                    ),
-                    Container(
-                        content=Column(
-                            [
-                                self.input_json_field,
-                                OutlinedButton(text="Save", on_click=self.check_config_submit)
-                            ]
-                        )
-                    ),
-                    self.error_message  # Display error message if JSON is invalid
-                ]
-            )
-        )
-        self.agent_row = self.build_agent_row()
+    # def __post_init__(self):
+    #     self.agent_configuration_menu = self.agent_config_functionality()
 
-
-    def check_config_submit(self, e):
-        custom_config: str = self.input_json_field.value
-        if check_yaml_field(self.input_json_field):
-            self.custom_config = custom_config
-            pass
-        elif check_json_field(self.input_json_field):
-            self.custom_config = custom_config
-            pass
-        else:
-            self.platform.page.open(error_modal.error_modal())
-            self.error_message.value = "Improper JSON or YAML was submitted, please try again"
-            return
-
-
-    def check_yaml_submit(self, e) -> None:
-        yaml_string: str = self.input_json_field.value
-        check_yaml_field(yaml_string)
-
-
-    def get_agent_color(self):
-        return "green"
-
-    def check_json_submit(self, e) -> None:
-        # Attempt to parse JSON input
-        custom_json = self.input_json_field.value
-        try:
-            json.loads(custom_json)  # json.loads to validate JSON string
-            self.custom_config = custom_json
-
-            # Change the Agent's custom JSON in Platform instance
-            self.added_agents[self.agent_name][1] = self.custom_config
-            self.error_message.value = ""  # Clear error message if JSON is valid
-        except json.JSONDecodeError:
-            self.error_message.value = "You've submitted improper JSON"
-        
-        # Update UI elements to reflect changes
-        self.error_message.update()
-        self.input_json_field.update()
-
-
-    def remove_agent_from_selection(self) -> None:
-        # Find the index of the container with the unique identifier (key)
-        def find_container_index() -> int:
-            for index, control in enumerate(self.agent_config_container.controls):
-                if isinstance(control, Container) and control.key == self.agent_row.key:
-                    return index
-            return -1  # Return -1 if the container key is not found
-
-        # Attempt to remove the found container and update the UI
-        try:
-            container_index = find_container_index()
-            if container_index != -1:
-                del self.agent_config_container.controls[container_index]
-                self.agent_config_container.update()
-            else:
-                print("The agent row is not found in the container controls list.")
-        except ValueError as e:
-            print(f"An error occurred: {e}")
-            print("The agent row is not found in the container controls list.")
-
-
-    # delete self from added agents in platform instance, and all containers that contain itself
-    def remove_agent_receiver(self, e):
-        self.platform.event_bus.publish("remove_agent")
-        if self.agent_tile in self.platform_agent_container.controls:
-            del self.added_agents[self.agent_name]
-            self.platform_agent_container.controls.remove(self.agent_tile)
-            self.platform_agent_container.update()
-            # Also delete from agent container in agent config
-            remove_from_selection(self.agent_config_container, self.agent_row.key)
-
-    def build_agent_row(self):
-        agent_card = self.build_agent_card()
-        agent_row_stack = Stack(
-            key=f"agent_row_stack_{self.agent_id}",
-            controls=[
-                Container(alignment=alignment.center_left, content=agent_card),
-                Container(
-                    alignment=alignment.center_right,
-                    content=IconButton(
-                        icon=icons.DELETE,
-                        on_click=self.remove_agent_receiver
-                    )
-                )
-            ]
-        )
-
-        agent_row = Container(
-            key=f"agent_row_{self.agent_id}",
-            height=70,
-            content=agent_row_stack 
-        )
-        return agent_row
-
-    def build_agent_card(self) -> Container:
-        return self.agent_tile
-
-    def build_agent_configuration(self) -> Container:
-        return self.agent_configuration_menu
+    # def build_agent_configuration(self) -> Container:
+    #     return self.agent_configuration_menu

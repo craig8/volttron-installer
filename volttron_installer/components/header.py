@@ -1,21 +1,17 @@
-"""
-Module to manage the header section of the platform management application using the Flet framework.
-"""
-
-from flet import *
+from volttron_installer.modules.attempt_to_update_control import attempt_to_update_control
 from volttron_installer.modules.validate_field import validate_text
 from volttron_installer.components.platform_components.platform import Platform
+from flet import *
 
 class Header:
     """
     Class to represent and manage the header section of the platform management application.
 
     Attributes:
-        shared_instance (Platform): Shared instance of the Platform class containing platform information.
-        submit_button (OutlinedButton): The button used to deploy the platform.
+        shared_instance (Platform): Shared instance of the Platform class containing platform information and methods.
         route (str): The route to go back to on clicking the back button.
     """
-    def __init__(self, shared_instance, submit_button: OutlinedButton, route: str):
+    def __init__(self, shared_instance: Platform, route: str):
         """
         Initialize a Header instance.
 
@@ -29,11 +25,11 @@ class Header:
         self.route_back_to: str = route
         self.edit_mode: bool = False
 
-        self.deploy_button = submit_button
-        self.deploy_button.on_click = self.deploy_platform
+        self.deploy_button = OutlinedButton(text="Deploy", disabled=True, on_click=self.deploy_platform)
 
         # Subscribe to platform events
-        self.platform.event_bus.subscribe("deploy_button_update", self.adjust_submit_validity)
+        self.platform.event_bus
+        self.platform.event_bus.subscribe("toggle_deploy", self.adjust_submit_validity)
 
         # Initialize editing logic for button icons
         self.editing_icon = icons.EDIT
@@ -79,60 +75,21 @@ class Header:
                 alignment=MainAxisAlignment.SPACE_BETWEEN,
             ),
         )
-
-    def deploy_platform(self, e) -> None:
-        """
-        Handle the platform deployment event.
-
-        Args:
-            e: The event object.
-        """
-        print("Header: everyone update their UI!")
-        self.platform.flip_activity()
-
-        # Make platformTile push all data entries into the shared instance
-        self.platform.event_bus.publish("deploy_all_data", "self.submit_fields()")
-        self.platform.page.update()
-        self.header.update()
     
     def adjust_submit_validity(self, state: bool):
-        """
-        Adjust the validity of the submit button.
+        self.deploy_button.disabled = not state
+        attempt_to_update_control(self.deploy_button)
 
-        Args:
-            state (bool): The state to set for the submit button's disabled property.
-        """
-        self.deploy_button.disabled = state
-        self.deploy_button.update()
-
-    def deploy_to_platform(self, e) -> None:
-        """
-        Deploy to the platform.
-
-        Args:
-            e: The event object.
-        """
+    def deploy_platform(self, e) -> None:
         self.platform.flip_activity()
-
-        # Tell PlatformTile to update their UI after submission
-        self.platform.event_bus.publish('process_data', "self.update_platform_tile_ui()")
+        self.platform.event_bus.publish("deploy_platform", None)
+        self.platform.event_bus.publish('update_ui', None)
 
     def delete_platform(self, e) -> None:
-        """
-        Handle the delete button click event.
-
-        Args:
-            e: The event object.
-        """
-        print("You have deleted me how dare you!")
+        pass
+        # print("You have deleted me how dare you!")
 
     def handle_editing_mode(self, e) -> None:
-        """
-        Handle the editing mode for the title.
-
-        Args:
-            e: The event object.
-        """
         if self.edit_mode:
             self.title = self.title_editing_field.value
             self.title_container.content.value = self.title  # Update the text value
@@ -146,7 +103,4 @@ class Header:
         self.platform.page.update()
 
     def return_header(self) -> Container:
-        """
-        Return the header container.
-        """
         return self.header

@@ -21,8 +21,9 @@ from volttron_installer.components.background import gradial_background
 from volttron_installer.components.platform_tile import PlatformTile
 from volttron_installer.components.platform_components.platform import Platform, ObjectCommunicator
 from volttron_installer.modules.global_event_bus import global_event_bus
-# Empty list to keep track of platforms, using this list to avoid duplicate URLs
-platforms_added = []
+
+
+refreshed = False
 
 # Helper function to generate a random URL path
 def generate_random_path(length=7) -> str:
@@ -31,29 +32,37 @@ def generate_random_path(length=7) -> str:
 
 # Generates until URL is unique
 def generate_URL() -> str:
+    platforms_added = platforms.keys()
     while True:
         new_url = generate_random_path()
         generated_url = f"/{new_url}"
         if generated_url not in platforms_added:
-            platforms_added.append(generated_url)
-            return "/h8NU5I1" # HARD-CODING FOR TESTING
-            #return generated_url
+            return generated_url
 
 def numerate_amount_of_platforms() -> str:
-    platform_number = len(platforms_added)
+    platform_number = len(platforms)
     return f"P{platform_number + 1}"
 
 def home_view(page: Page) -> View:
     from volttron_installer.views import InstallerViews as vi_views
 
     def refresh_platforms() -> None:
+        global refreshed
         for uid in platforms.keys(): #.keys()
-            working_var = platforms[uid] # platforms json dump var
+            working_platform = platforms[uid] # platforms json dump var
             event_bus = ObjectCommunicator()
-            init_platform = Platform(working_var["name"], page, event_bus, global_event_bus)
-            init_platform.added_hosts = working_var["host"]
-            init_platform.address= working_var["address"]
-            init_platform.added_agents = working_var["agents"]
+            init_platform = Platform(working_platform["title"], page, uid, event_bus, global_event_bus)
+            init_platform.added_hosts = working_platform["host"]
+            init_platform.address= working_platform["address"]
+            init_platform.ports = working_platform["ports"]
+            init_platform.added_agents = working_platform["agents"]
+
+            # Load tile on platform tab
+            init_platform_tile = PlatformTile(platform_tile_container, init_platform)
+            platform_tile_container.controls.append(init_platform_tile.build_card())
+            page.update()
+            init_platform.load_platform()   
+            refreshed= True
 
     def add_platform_tile(e) -> None:
         # Creates a single instance of ObjectCommunicator to be used throughout the whole platform
@@ -73,6 +82,9 @@ def home_view(page: Page) -> View:
     
     def tab_change(selected_index):
         global_event_bus.publish("tab_change", selected_index)
+
+    if refreshed == False:
+        refresh_platforms()
 
     # Initialize tabs
     agent_setup_tab = agent_setup.AgentSetupTab(page).build_agent_setup_tab()
