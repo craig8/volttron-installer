@@ -9,6 +9,8 @@ import flet.fastapi as flet_fastapi
 from fastapi import FastAPI, Request
 from flet import Page, RouteChangeEvent
 from volttron_installer.modules.global_event_bus import global_event_bus
+from starlette.responses import RedirectResponse
+from flet import AppBar, Dropdown, ElevatedButton, Page, Text, View, colors, RouteChangeEvent
 
 from .settings import get_settings
 
@@ -43,7 +45,10 @@ async def main(page: Page):
                     page.views.append(p.instance(page=page))
                     found = True
                     break
-            
+
+            if not found:
+                return
+
             # If not found, check dynamic routes
             if not found:
                 page.views.append(dynamic_routes[e.route])
@@ -51,8 +56,8 @@ async def main(page: Page):
 
             if not found:
                 raise ValueError(f"The route {e.route} was not defined.")
-            
-            # If we are on the home page, publish a signal to refresh all the 
+
+            # If we are on the home page, publish a signal to refresh all the
             # form tiles.
             if page.route == "/":
                 global_event_bus.publish("tab_change")
@@ -82,10 +87,17 @@ async def lifespan(app: FastAPI):
 
 # Create the fastapi app
 app = FastAPI(lifespan=lifespan)
+#backend_app = FastAPI()
+
+from .backend import init as init_backend
+
+init_backend(app)
+# Mount the backend app to the fastapi app.  More than one endpoint can be mounted to the same fastapi app.
+#app.mount("/backend", backend_app)
 
 # Mount the flet app to the fastapi app.  More than one endpoint can be mounted to the same fastapi app.
 app.mount(
-    "/",
+    "/ui",
     flet_fastapi.app(main,
                      web_renderer=ft.WebRenderer.AUTO,
                      upload_dir="volttron_installer/uploaded_configs")
@@ -93,6 +105,10 @@ app.mount(
                     #      settings.upload_dir).expanduser().as_posix()))
                     )
 
+
+@app.get("/")
+async def index(request: Request):
+    return RedirectResponse(url="/ui")
 
 if __name__ == '__main__':
     import uvicorn
