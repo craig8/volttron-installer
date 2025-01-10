@@ -7,7 +7,8 @@ from pathlib import Path
 import flet as ft
 import flet.fastapi as flet_fastapi
 from fastapi import FastAPI, Request
-from flet import AppBar, Dropdown, ElevatedButton, Page, Text, View, colors, RouteChangeEvent
+from flet import Page, RouteChangeEvent
+from volttron_installer.modules.global_event_bus import global_event_bus
 
 from .settings import get_settings
 
@@ -51,6 +52,11 @@ async def main(page: Page):
             if not found:
                 raise ValueError(f"The route {e.route} was not defined.")
             
+            # If we are on the home page, publish a signal to refresh all the 
+            # form tiles.
+            if page.route == "/":
+                global_event_bus.publish("tab_change")
+
             page.update()
 
         def view_pop(view):
@@ -82,8 +88,10 @@ app.mount(
     "/",
     flet_fastapi.app(main,
                      web_renderer=ft.WebRenderer.AUTO,
-                     upload_dir=Path(
-                         settings.upload_dir).expanduser().as_posix()))
+                     upload_dir="volttron_installer/uploaded_configs")
+                    #  upload_dir=Path(
+                    #      settings.upload_dir).expanduser().as_posix()))
+                    )
 
 
 if __name__ == '__main__':
