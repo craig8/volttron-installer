@@ -4,6 +4,7 @@ import json
 # Define the relative path
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PERSISTENT_DIR = os.path.join(BASE_DIR, 'persistence_files')
+os.makedirs(PERSISTENT_DIR, exist_ok=True)
 
 PERSISTENT_HOSTS_FILE = os.path.join(PERSISTENT_DIR, "hosts.json")
 PERSISTENT_AGENTS_FILE = os.path.join(PERSISTENT_DIR, "agents.json")
@@ -35,5 +36,7 @@ def write_to_file(file: str, var: any) -> None:
 
 def dump_to_var(file: str) -> any:
     """Takes file name and returns corresponding JSON content"""
+    if not os.path.exists(file_map[file]):
+        return {}
     with open(file_map[file], "r") as f:
         return json.load(f)

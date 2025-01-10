@@ -17,6 +17,8 @@ class BaseTile:
 
     def __init__(self, title: str):
         self.title = title
+        if BaseTile.counter == {}:
+            BaseTile.counter = 0
         BaseTile.counter += 1
         write_to_file("tile_id", BaseTile.counter)
 
@@ -24,7 +26,7 @@ class BaseTile:
         tile = build_default_tile(self.title)
         tile.key = f"container: {self.counter}"
         return tile
-    
+
     def list_attributes(self):
         """Returns a list of the child class' attributes"""
         attributes = []
@@ -61,10 +63,10 @@ class BaseForm:
                                             ),
                                             Container(
                                                 content=Container(
-                                                    width=20, 
-                                                    height=20, 
-                                                    bgcolor=colors.with_opacity(1, "orange"), 
-                                                    border_radius=50, 
+                                                    width=20,
+                                                    height=20,
+                                                    bgcolor=colors.with_opacity(1, "orange"),
+                                                    border_radius=50,
                                                     animate=animation.Animation(2000, AnimationCurve.EASE_IN)
                                                     ),
                                                 alignment=alignment.center,
@@ -88,8 +90,8 @@ class BaseForm:
                 *self.formatted_fields,
                 Row(
                     [
-                        Container(content=self.submit_button, margin=margin.only(left=10)), 
-                        self.revert_button, 
+                        Container(content=self.submit_button, margin=margin.only(left=10)),
+                        self.revert_button,
                         self.changes_indicator
                     ]
                 ),
@@ -110,7 +112,7 @@ class BaseForm:
         attempt_to_update_control(self.changes_indicator)
         self.toggle_submit_button(self.changed)
         attempt_to_update_control(self.page)
-        
+
         if message:
             self.general_notifier.display_snack_bar(message=message)
 
@@ -121,7 +123,7 @@ class BaseForm:
                         revert to as a kwarg
         """
         textfields: list[TextField] = revert_map.keys()
-        
+
         print(revert_map)
 
         for i in textfields:
@@ -139,7 +141,7 @@ class BaseForm:
         self.revert_button.visible=True
         self.changes_indicator.visible=True
         self.page.update()
-        
+
         ring_one: Container = self.changes_indicator.controls[1].content
         while self.changed:
             if ring_one.height == 20:
@@ -156,7 +158,7 @@ class BaseForm:
                 ring_one.height = 20
                 ring_one.width = 20
                 ring_one.bgcolor=colors.with_opacity(.9, "orange")
-                
+
                 self.page.update()
                 sleep(2.5)
 
@@ -215,18 +217,18 @@ class BaseForm:
 
     def write_to_file(self, file: str, global_lst: list):
         write_to_file(file, global_lst)
-    
+
     def replace_key(self, dictionary: dict, old_key: str, new_key: str):
         if old_key in dictionary:
             dictionary[new_key] = dictionary.pop(old_key)
 
     async def detect_conflict(self, working_dict: dict, new_name: str, old_name: str) -> bool | str:
         print("\nDetecting if there is a conflict")
-        
+
         if new_name == old_name:
             print("We are just saving without changing the name.")
             return "rename"  # No conflict since it's the same name
-        
+
         print(f"Here is our working dict:\n{working_dict}\nHere is the new name we are trying to parse:\n{new_name}")
 
         if new_name in working_dict:
@@ -234,7 +236,7 @@ class BaseForm:
             overwrite_decision = await self.warning_modal(new_name)
             return overwrite_decision  # True if we want to overwrite, False otherwise
         else:
-            return "clean"  # No conflict, as the new name does not exist 
+            return "clean"  # No conflict, as the new name does not exist
 
 
     async def warning_modal(self, new_name: str) -> bool:
@@ -286,16 +288,16 @@ class BaseForm:
 
     async def check_overwrite(self, old_name: str, working_dict: dict, new_name: str) -> bool | str:
         print(f"\nChecking the overwrite of '{old_name}' with '{new_name}'")
-        
+
         if old_name == new_name:
             print("We are renaming the existing item without changing its name.")
             return "rename"
-        
+
         conflict_detected = await self.detect_conflict(working_dict, new_name, old_name)
-        
+
         return conflict_detected
 
-                
+
     def build_form(self) -> Column:
         return self._form
 
@@ -310,7 +312,7 @@ class BaseTab:
         # Initialize column widths
         self.left_column_width = 200  # Initial width for the instance tile column
         self.right_column_width = page.width - self.left_column_width - 10  # Initial width for the form column
-        
+
         # Get our tab so the children can access a consistent variable without having to run the function again
         self.tab = self.build_base_tab()
 
@@ -336,7 +338,7 @@ class BaseTab:
             # form_container.update()
             tab_view.update()
             self.page.update()
-        
+
         vertical_divider = GestureDetector(
             mouse_cursor=MouseCursor.RESIZE_COLUMN,
             content=VerticalDivider(
@@ -364,7 +366,7 @@ class BaseTab:
             )
         )
         return tab_view
- 
+
     def refresh_tiles(self, file_name: str, global_dict: dict, instance_cls: type, instance_form_cls: type):
         if not self.contains_container():  # Checking if the container exists
             for key, item in global_dict.items():
@@ -410,7 +412,7 @@ class BaseTab:
 
     def configure_new_instance(self, file_name: str, global_list: list, instance_values, tile: Container, form: BaseForm, instance):
         tile.on_click = lambda e: self.select_tile(e, form)
-        tile.content.controls[1].on_click = lambda e: self.remove_warning_wrapper(e, global_list, file_name, 
+        tile.content.controls[1].on_click = lambda e: self.remove_warning_wrapper(e, global_list, file_name,
                                                                                    instance_attributes={"name": instance_values[0], "id": tile.key})
         self.instance_tile_column.controls.append(tile)
         attempt_to_update_control(self.instance_tile_column)
@@ -422,7 +424,7 @@ class BaseTab:
             if isinstance(control, Container):
                 return True
         return False
-    
+
     def soft_remove(self, key: str) -> None:
         remove_from_selection(self.instance_tile_column, key)
         self.tab.content.controls[2].content.controls[0] = Column(expand=3)
@@ -455,7 +457,7 @@ class BaseTab:
                 Text("WARNING!", color="red", size=22),
                 Text(f"Are you sure you want to permanently remove ", spans=[
                     TextSpan(
-                        f"{subject_name}", 
+                        f"{subject_name}",
                         TextStyle(
                             font_family="Consolas",
                             bgcolor=colors.with_opacity(0.2, "black")
