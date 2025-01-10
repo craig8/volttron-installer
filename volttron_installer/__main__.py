@@ -113,4 +113,4 @@ async def index(request: Request):
 if __name__ == '__main__':
     import uvicorn
 
-    uvicorn.run("volttron_installer.__main__:app")
+    uvicorn.run("volttron_installer.__main__:app", reload=True)
