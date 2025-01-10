@@ -10,9 +10,10 @@ modules may be less intuitive than inheritance but i believe that this is solved
 class, which allows for objects to subscribe to and recieve specific signals so they can execute their
 own self.functions() or just interpret the data that have been sent from other modules!
 """
-
+from pprint import pprint
 from flet import Page
 from volttron_installer.modules.global_configs import global_hosts, global_agents, platforms
+from volttron_installer.components.general_notifier import GeneralNotifier
 from volttron_installer.modules.write_to_json import write_to_file
 import time
 
@@ -92,16 +93,22 @@ class Platform:
         self.ports = ""
 
         self.added_hosts = {} # host_id : {key:val, key:val}
-        self.added_agents = {} # agent name : [agent object, custom JSON (defaults to False if none)]
-# we can use the agent name to parce the agents.json file and get the rest of what we need to deploy
+        self.added_agents = {} # {agent name : {key: val, key: val}
+        # we can use the agent name to parse the agents.json file and get the rest of what we need to deploy
 
 
-        self.activity: str = "OFF"  # OFF by default
         self.event_bus: ObjectCommunicator = event_bus  # Initialize the Object communicator for all platform components
         self.event_bus.subscribe("deploy_platform", self.deploy_platform)
         
         self.global_bus: ObjectCommunicator = global_bus # Initialize global event bus that observes the state of the app
         self.global_bus.subscribe("update_global_ui", self.update_global_ui)
+
+        self.deployed = False
+        self.running = False
+        self.activity: str = "OFF"  # OFF by default
+
+        self.snack_bar = GeneralNotifier(self.page)
+        self.tile_key: str
 
     def load_platform(self):
         self.event_bus.publish("load_platform")
@@ -111,31 +118,41 @@ class Platform:
 
     def deploy_platform(self, data=None):
         self.gather_commits()
+        self.deployed=True
+
+        # TODO
+        # fix how this is, i dont like how we need to time.sleep to gather our commits; it should just work fluidly
         time.sleep(2)
-        # print(f"\n\nDeploying platform with uid of {self.generated_url}")
-        # print(f"Added Host: {self.added_hosts}")
-        # print(f"Name: {self.title}")
-        # print(f"Address: {self.address}")
-        # print(f"Bus Type: {self.bus_type}")
-        # print(f"Ports: {self.ports}")
-        # print(f"Added Agents: {self.added_agents}")
+
+        # Debug
+        # pprint(f"\n\nDeploying platform with uid of {self.generated_url}")
+        # pprint(f"Added Host: {self.added_hosts}")
+        # pprint(f"Name: {self.title}")
+        # pprint(f"Address: {self.address}")
+        # pprint(f"Bus Type: {self.bus_type}")
+        # pprint(f"Ports: {self.ports}")
+        # pprint(f"Added Agents: {self.added_agents}")
         
         dictionary_appendable = {
             "title" : self.title,
-            "host" : self.added_hosts,
+            "deployed" : self.deployed,
+            "running" : self.running,
             "address" : self.address,
             "bus_type" : self.bus_type,
             "ports" : self.ports,
+            "host" : self.added_hosts,
             "agents" : self.added_agents
         }
         platforms[self.generated_url] = dictionary_appendable
         write_to_file("platforms", platforms)
+        self.snack_bar.display_snack_bar("Deployed!")
         # print(platforms)
 
     def update_global_ui(self, data):
         # Now we are working downwards and telling every component to update their UI
         self.event_bus.publish("update_global_ui", None)
 
+    # Rudimentary code just to see the UI updates of the platform tile in Overview platforms tab 
     def flip_activity(self) -> None:
         self.activity = "OFF" if self.activity == "ON" else "ON"
         # print(f"Platform: I turned activity to: {self.activity}") # Debug # print

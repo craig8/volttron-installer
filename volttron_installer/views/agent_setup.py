@@ -1,4 +1,4 @@
-from logging import config
+from time import sleep
 from typing import Union
 from volttron_installer.components.base_tile import BaseForm, BaseTab, BaseTile
 from volttron_installer.modules.prettify_string import prettify_json, prettify_yaml
@@ -9,16 +9,16 @@ from volttron_installer.modules.global_event_bus import global_event_bus
 from volttron_installer.modules.remove_from_controls import remove_from_selection
 from volttron_installer.modules.styles import modal_styles2
 from volttron_installer.modules.populate_dropdowns import numerate_configs_dropdown
-from volttron_installer.modules.validate_field import check_yaml_field, check_json_field, check_format
+from volttron_installer.modules.validate_field import check_yaml_field, check_json_field, check_format, preprocess_string
 from volttron_installer.components.error_modal import error_modal
-from volttron_installer.components.template_editor_modal import ConfigFormTemplate, ConfigTemplate
+from volttron_installer.modules.clean_json_string import clean_json_string
+from volttron_installer.components.agent_specific_template_editor import ConfigFormTemplate, ConfigTemplate
 from dataclasses import dataclass, field
 from volttron_installer.components.upload_config import ConfigFilePicker
 import json
 import yaml
+import asyncio
 from flet import *
-
-from volttron_installer.modules.write_to_json import write_to_file
 
 key_constructor =[
     "agent_name",
@@ -55,10 +55,9 @@ class AgentForm(BaseForm):
         #NOTE:
         # handling the file picker and events and stuff of that nature 
         self.pick_config_file = ConfigFilePicker(self.page)
-        
         self.load_configs_btn = OutlinedButton(
                                     icon=icons.UPLOAD_FILE, 
-                                    on_click= lambda e: self.pick_config_file.launch_file_picker(allowed_extensions=["yaml", "json"])
+                                    on_click= self.upload_agent_config_wrapper
                                 )
         
         self.agent_configuration_field = TextField(
@@ -73,9 +72,9 @@ class AgentForm(BaseForm):
         global_event_bus.subscribe("added_config_template", self.update_template_dropdown)
 
         self.config_dropdown: Dropdown = numerate_configs_dropdown()
-        self.config_dropdown.value = "None"
         attempt_to_update_control(self.config_dropdown)
-        self.config_dropdown.on_change = "" # method 
+        self.config_dropdown.value= "None" # Set none as default value
+        self.config_dropdown.on_change = self.hard_change_dropdown_value # method 
         self.config_name_field: TextField = TextField(
                                                 label="Entry Name",
                                                 on_change=self.validate_template_addition
@@ -87,18 +86,13 @@ class AgentForm(BaseForm):
                             Text("Add Template", size=20),
                             self.config_dropdown,
                             self.config_name_field,
-                            Container(
-                                margin=margin.only(bottom=-20),
-                                padding=padding.only(left=25, right=25),
-                                alignment=alignment.bottom_center,
-                                content=Row(
-                                    controls=[
-                                        OutlinedButton(on_click=lambda e: self.page.close(self.modal),
-                                                    content=Text("Cancel", color="red")),
-                                        self.add_template_button
-                                    ],
-                                    alignment=MainAxisAlignment.SPACE_BETWEEN
-                                )
+                            Row(
+                                [
+                                OutlinedButton(on_click=lambda e: self.page.close(self.modal),
+                                    content=Text("Cancel", color="red")),
+                                self.add_template_button
+                                ],
+                                alignment=MainAxisAlignment.SPACE_AROUND
                             )
                         ]
                     )
@@ -140,7 +134,7 @@ class AgentForm(BaseForm):
 
         form_fields = {
             "Name" : self.agent_name_field,
-            "Identity" : self.identity_field,
+            "Identity File" : self.identity_field,
             "Agent Path" : self.agent_path_field,
             "Agent Configuration" : Row(controls=[self.agent_configuration_field, self.load_configs_btn]),
             "Config Store Entries" : OutlinedButton(text="Add", on_click=lambda e: self.page.open(self.modal)),
@@ -152,7 +146,22 @@ class AgentForm(BaseForm):
         self.agent_config_validity = True
         self.agent_config_type: str | "YAML" | "JSON" = ""
         self.added_config_store_entries: dict = self.load_config_store_entries()
+        
+        self.revert_button.on_click = lambda _: self.revert_all_changes()
         self.__post_init__()
+
+    def hard_change_dropdown_value(self, e) -> None:
+        print(e.control.value)
+        self.config_dropdown.value = e.control.value
+        print(self.config_dropdown.value)
+
+    def revert_all_changes(self):
+        self.revert_changes({
+            self.agent_name_field : self.agent.agent_name,
+            self.identity_field: self.agent.identity,
+            self.agent_path_field: self.agent.agent_path
+        })
+        self.load_agent_config()
 
     def update_template_dropdown(self, data= None) -> None:
         # print("We gotta be updating this dropdown type shi")
@@ -182,12 +191,18 @@ class AgentForm(BaseForm):
 
     # Loads the saved data
     def __post_init__(self):
+        # Handling agent specific template editor
         tiles_to_append = []
         for i in self.added_config_store_entries.keys():
             tiles_to_append.append(self.create_added_entry_tile(title=i, empty_config=False))
         self.added_config_entries_container.content.controls[0].controls.extend(tiles_to_append)
         attempt_to_update_control(self.added_config_entries_container)
+        self.load_agent_config()
 
+        if self.agent.identity == "":
+            self.agent.identity="~/.ssh/id_rsa/"
+
+    def load_agent_config(self) -> None:
         config_type = check_format(str(self.agent.agent_configuration))
         if config_type == "JSON":
             self.agent_configuration_field.value = prettify_json(self.agent.agent_configuration)
@@ -195,12 +210,52 @@ class AgentForm(BaseForm):
             self.agent_configuration_field.value = prettify_yaml(self.agent.agent_configuration)
         attempt_to_update_control(self.agent_configuration_field)
 
-    def save_config_store_entries(self, e) -> None:
+    def upload_agent_config_wrapper(self, e):
+        # Create a task to run the async method
+        asyncio.run(self.upload_agent_config())
+
+    async def upload_agent_config(self): 
+        from ..components.uploading_modal import UploadingModal
+        data: tuple = await self.pick_config_file.launch_file_picker(allowed_extensions=["yaml", "json"])
+        print(f"ok are we rlly in this?\n{data}\n")
+        if data:
+            print(f"Data received: {data}")
+            config_type = data[0]
+            if config_type == "JSON":
+                self.agent_configuration_field.value = prettify_json(data[1])
+            elif config_type == "YAML":
+                self.agent_configuration_field.value = prettify_yaml(data[1])
+
+            self.agent_configuration_field.update()            
+        else:
+            print("No data or failed to pick a file.")
+
+    def soft_remove_template_tile(self, title) -> None:
+        for tile in self.added_config_entries_container.content.controls[0].controls:
+            # Grabbing the Text control's value in the tile container
+            if tile.content.controls[0].value == title:
+                remove_from_selection(self.added_config_entries_container.content.controls[0], tile.key)
+                self.added_config_entries_container.content.controls[1] = Column()
+                attempt_to_update_control(self.page)
+                pass
+
+    async def save_config_store_entries(self, e) -> None:
         # on dropdown change, fill out the text field with value as a default name
         title: str = self.config_name_field.value
+        check_overwrite = await self.check_overwrite("", self.agent.config_store_entries, title)
+
+        if check_overwrite:
+            self.soft_remove_template_tile(title)
+            print("hello")
+            print(self.added_config_entries_container.content.controls[0].controls)
+            # global_event_bus.publish("soft_remove", ) 
+        else:
+            return
+
         if self.config_dropdown.value == "None":
             self.added_config_entries_container.content.controls[0].controls.append(self.create_added_entry_tile(title, empty_config=True))
         elif self.config_dropdown.value not in self.added_config_store_entries:
+            # print(f"\nWe have not added such a template, this is our selected: {self.config_dropdown.value}\nHere is our global drivers: {global_drivers}")
             self.added_config_store_entries[title] = global_drivers[self.config_dropdown.value]
             self.added_config_entries_container.content.controls[0].controls.append(self.create_added_entry_tile(title, empty_config=False))
         attempt_to_update_control(self.added_config_entries_container)
@@ -241,6 +296,8 @@ class AgentForm(BaseForm):
     def remove_from_added_entries(self, title: str, id: str) -> None:
         del self.added_config_store_entries[title]
         remove_from_selection(self.added_config_entries_container.content.controls[0], id)
+        self.added_config_entries_container.content.controls[1] = Column()
+        attempt_to_update_control(self.added_config_entries_container)
 
     def config_entry_edited(self, new_config: dict) -> None:
         pass
@@ -269,67 +326,55 @@ class AgentForm(BaseForm):
         else:
             self.toggle_submit_button(valid)
 
-    def check_agent_config_field(self) -> bool:
-        valid_config: Union[bool, str, dict]
-        self.agent_configuration_field.value = str(self.agent_configuration_field.value)
+        self.changes_detected()
         
-        if check_json_field(self.agent_configuration_field):
-            self.agent_config_type = "JSON"
-            # print("i am passing as json", self.agent_configuration_field.value)
-            valid_config = json.loads(self.agent_configuration_field.value)
-            return valid_config
-        elif check_yaml_field(self.agent_configuration_field):
-            # print("\ni am passing as yaml:\n", self.agent_configuration_field.value)
-            self.agent_config_type = "YAML"
-            valid_config = yaml.safe_load(self.agent_configuration_field.value)
-            # print("\nThis is the yaml im verifying:\n",valid_config)
-            return valid_config
-        else:
-            self.page.open(error_modal())
-            return False
         
     async def save_config(self, e) -> None:
         old_name = self.agent.agent_name
-        check_overwrite = await self.check_overwrite(self.agent.agent_name, global_agents, self.agent_name_field.value)
 
-        # check_overwrite: bool | None = await self.detect_conflict(global_agents, self.agent_name_field.value, self.agent.agent_name)
-
+        check_overwrite = await self.check_overwrite(old_name, global_agents, self.agent_name_field.value)
         if check_overwrite == True:
             global_event_bus.publish("soft_remove", self.agent.tile.key)
 
         elif check_overwrite == False:
             return
 
-        
         # print("\n-------------------------------------------------\nthe saving process is begininig\n")
-        valid_config: bool | dict | str = self.check_agent_config_field()
+        valid_config = check_format(self.agent_configuration_field.value)
         if valid_config == False:
+            self.page.open(error_modal())
             return
         
-        # print("\nThis is my freshly validated config:\n", valid_config)
+        print("\nThis is my freshly validated config:\n", self.agent_configuration_field.value,"and bro is regstered as :", valid_config)
 
-        if self.agent_config_type == "YAML":
+        config_data = ""
+        try:
+            if valid_config == "JSON":
+                content_data = self.agent_configuration_field.value
+                
+                # Parse the JSON content using json.loads
+                parsed_data = json.loads(content_data)
+                config_data = parsed_data
+                check_json_field(self.agent_configuration_field)
+        except json.JSONDecodeError as e:
+            print(f"JSON Decode Error from saving agent configuration in agent_setup.py: {e}")
+
+        if valid_config == "YAML":
+            check_yaml_field(self.agent_configuration_field)
             # Reconvert to YAML string to preserve format for saving/displaying
-            valid_config_str = yaml.dump(valid_config, sort_keys=False, default_flow_style=False)
-            valid_config = valid_config_str
-            # print("\nThis is my freshly validated YAML config:\n", valid_config_str)
-        else:
-            # print("\nThis is my freshly validated JSON config:\n", valid_config)
-            pass
-
-
-
+            # valid_config_str = yaml.dump(self.agent_configuration_field.value, sort_keys=False, default_flow_style=False)
+            config_data = self.agent_configuration_field.value 
 
         # Save field values to agent attributes
         self.agent.identity = self.identity_field.value
         self.agent.agent_path = self.agent_path_field.value
-        self.agent.agent_configuration = valid_config
+        self.agent.agent_configuration = config_data
         self.agent.agent_name = self.agent_name_field.value
 
         dictionary_appendable = {
             "identity" : self.agent.identity,
             "agent_path" : self.agent.agent_path,
-            "agent_configuration" : valid_config,
+            "agent_configuration" : self.agent.agent_configuration,
             "config_store_entries" : self.added_config_store_entries
         }
 
@@ -342,17 +387,19 @@ class AgentForm(BaseForm):
         self.agent.tile.content.controls[0].value = self.agent.agent_name
         attempt_to_update_control(self.page)
         self.write_to_file("agents", global_agents)
+        self.changes_finalized(1)
         update_global_ui()
 
 class AgentSetupTab(BaseTab):
     def __init__(self, page: Page) -> None:
         self.list_of_agents = Column(
             expand=2,
+            scroll=ScrollMode.AUTO,
             controls=[
                 OutlinedButton(text="Setup an Agent", on_click=self.add_new_agent)
             ]
         )
-        super().__init__(self.list_of_agents, page)
+        super().__init__(instance_tile_column=self.list_of_agents, page=page)
         self.page = page
         self.agent_tab_view = self.tab
 

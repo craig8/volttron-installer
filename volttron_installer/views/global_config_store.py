@@ -116,16 +116,43 @@ class ConfigForm(BaseForm):
         self.submit: bool = False
         self.content_validity: bool= False
 
+        self.revert_button.on_click = lambda _: self.revert_all_changes()
+
         self.content_value: dict | str = self.config.content
         self.detected_content_format: str = self.config.type
         self.__post_init__()
 
+    def revert_all_changes(self):
+        
+        self.view_type_radio_group.value = self.config.type
+        self.config_mode = self.config.type
+
+        if self.config_mode == "JSON":
+            self.plug_into_content_input_container()
+            self.json_content_editor.value = prettify_json(json.dumps(self.config.content))
+            check_json_field(self.json_content_editor)
+            attempt_to_update_control(self.json_content_editor)
+        else:
+            self.plug_into_content_input_container()
+            self.load_csv_to_data_table(self.config.content)
+
+        self.revert_changes({
+            self.name_field: self.config.name,
+        })
+        print("I am sleeping now!")
+        # NOTE
+        # im not sure why but using time sleep solves the issue of 
+        # when reverting changes in the text fields, the validate fields function
+        # causes the changes indicator to appear again. essentially putting the
+        # UI in a weird loop for whatever reason.
+        time.sleep(1.5)
+        self.changes_finalized()
+        self.toggle_submit_button(self.changed)
+
+
     def __post_init__(self) -> None:
         if self.config_mode == "JSON":
-            # print(f"\n\n For {self.config.name}This is the type of config into tf:\n{type(self.content_value)}\n{type(self.config.content)}")
-            # print(f"this is the actual value: \n{self.content_value}\n{self.config.content}")
             self.json_content_editor.value = prettify_json(json.dumps(self.content_value))
-            # print("\nzawgggg pls save meee:\n", type(self.json_content_editor.value))
             attempt_to_update_control(self.json_content_editor)
         else:
             self.load_csv_to_data_table(self.content_value)
@@ -214,7 +241,7 @@ class ConfigForm(BaseForm):
                         padding=padding.only(left=10),
                         height=50,
                         width=85,
-                        content=TextField(border="none")
+                        content=TextField(on_change=self.validate_fields, border="none")
                     )
                 )
     
@@ -228,7 +255,7 @@ class ConfigForm(BaseForm):
                 padding=padding.only(left=10),
                 height=50,
                 width=85,
-                content=TextField(border="none")
+                content=TextField(border="none", on_change=self.validate_fields)
             ),
         )
 
@@ -237,7 +264,7 @@ class ConfigForm(BaseForm):
         if self.detected_content_format == "CSV":
             self.json_content_editor.value = csv_string_to_json_string(self.content_value)
             self.load_csv_to_data_table(self.content_value)
-        elif self.detected_content_format == "JSON":
+        elif self.detected_content_format == "JSON" and self.content_value != "":
             self.json_content_editor.value = prettify_json(self.content_value)
             self.load_csv_to_data_table(json_string_to_csv_string(self.content_value))
         attempt_to_update_control(self.json_content_editor)
@@ -272,7 +299,8 @@ class ConfigForm(BaseForm):
         if all_fields_valid and self.content_validity:
             self.toggle_submit_button(True)  # Enable button if all fields are valid
         else:
-            self.toggle_submit_button(False)  # Disable button if any field is not valid
+            self.toggle_submit_button(False)  # Disable button if any field is not validb
+        self.changes_detected()
 
     def correct_input(self) -> bool:
         if self.config_mode == "CSV":
@@ -286,7 +314,7 @@ class ConfigForm(BaseForm):
             else:
                 return False
 
-    def type_change(self, e):
+    def type_change(self, e = None):
         # This means if our OLD type was json
         if self.config_mode == "JSON":
            self.content_value = self.clean_json_string(self.json_content_editor.value)
@@ -295,7 +323,7 @@ class ConfigForm(BaseForm):
             self.content_value = self.data_table_to_csv()
         
 
-        self.config_mode = e.control.value
+        self.config_mode = self.view_type_radio_group.value
         self.submit = True
         self.plug_into_content_input_container()
 
@@ -303,10 +331,12 @@ class ConfigForm(BaseForm):
         self.validate_fields(e)
 
     async def save_config(self, e) -> None:
-        check_overwrite: bool | None = await self.detect_conflict(global_drivers, self.name_field.value, self.config.name)
+        old_name = self.config.name
+        check_overwrite: bool | None = await self.check_overwrite(old_name, global_drivers, self.name_field.value)
 
         if check_overwrite == True:
             global_event_bus.publish("soft_remove", self.config.tile.key)
+
         elif check_overwrite == False:
             return
 
@@ -348,6 +378,7 @@ class ConfigForm(BaseForm):
         self.write_to_file("drivers", global_drivers)
         # print(global_drivers)
         global_event_bus.publish("added_config_template", None)
+        self.changes_finalized(1)
 
 class ConfigStoreManagerTab(BaseTab):
     def __init__(self, page: Page) -> None:

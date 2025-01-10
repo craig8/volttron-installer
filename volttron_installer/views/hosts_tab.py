@@ -1,6 +1,7 @@
-from email_validator import GLOBALLY_DELIVERABLE
+from time import sleep
 from volttron_installer.components.base_tile import BaseForm, BaseTab, BaseTile
 from flet import *
+from volttron_installer.modules.attempt_to_update_control import attempt_to_update_control
 from volttron_installer.modules.global_configs import global_hosts, find_dict_index
 from volttron_installer.modules.global_event_bus import global_event_bus
 from dataclasses import dataclass, field
@@ -37,7 +38,7 @@ class HostForm(BaseForm):
         self.ssh_sudo_user_field = TextField(on_change=self.validate_fields)
         self.identity_file_field = TextField(on_change=self.validate_fields)
         self.ssh_ip_address_field = TextField(on_change=self.validate_fields)
-        self.ssh_port_field = TextField(on_change=self.validate_fields)
+        self.ssh_port_field = TextField(on_change=self.validate_fields, on_focus=lambda _: print("meowwwws this is me being focused"))
         form_fields = {
             "Host ID" : self.host_id_field,
             "SSH SUDO USER" : self.ssh_sudo_user_field,
@@ -48,20 +49,36 @@ class HostForm(BaseForm):
 
         super().__init__(page, form_fields)
         self.host: Host = host
-        self.json_validity = True
+        self.revert_button.on_click = lambda _: self.revert_changes({
+            self.host_id_field: self.host.host_id,
+            self.ssh_sudo_user_field: self.host.ssh_sudo_user,
+            self.identity_file_field: self.host.identity_file,
+            self.ssh_ip_address_field: self.host.ssh_ip_address,
+            self.ssh_port_field: self.host.ssh_port
+            })
+        self.__post_init__()
+
+    def __post_init__(self) -> None:
+        print(f"this is the compy file {self.host.identity_file}")
+
+        # if host identity is blank
+        if self.host.identity_file == "":
+        # Pre-fill the identity file field with typical route
+            self.host.identity_file = "~/.ssh/id_rsa/"
+
 
     async def save_config(self, e) -> None:
         old_name = self.host.host_id
 
+        check_overwrite: bool | None = await self.check_overwrite(old_name, global_hosts, self.host_id_field.value)
 
-        if old_name == self.host_id_field.value:
-            check_overwrite="rename"
-        else:  
-            check_overwrite: bool | None = await self.detect_conflict(global_hosts, self.host_id_field.value, self.host.host_id)
-            if check_overwrite == True:
-                global_event_bus.publish("soft_remove", self.host.tile.key)
-            elif check_overwrite == False:
-                return
+        print(f" we are checking and bro is : {check_overwrite}")
+
+        if check_overwrite == True:
+            global_event_bus.publish("soft_remove", self.host.tile.key)
+
+        elif check_overwrite == False:
+            return
 
         # Save field values to host attributes
         self.host.ssh_sudo_user = self.ssh_sudo_user_field.value
@@ -81,13 +98,16 @@ class HostForm(BaseForm):
 
         if check_overwrite == "rename":
             self.replace_key(global_hosts, old_key=old_name, new_key=self.host.host_id)
-        
+
         global_hosts[self.host.host_id] = dictionary_appendable
 
         self.host.tile.content.controls[0].value = self.host.host_id
         self.page.update()
         self.write_to_file("hosts", global_hosts)
         global_event_bus.publish("update_global_ui")
+
+        # Finalized changes UI
+        self.changes_finalized(1)
 
 class HostTab(BaseTab):
     def __init__(self, page: Page) -> None:
