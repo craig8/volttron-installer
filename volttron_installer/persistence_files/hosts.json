@@ -1,1 +1,1 @@
-{"little_guys": {"ssh_sudo_user": "VOLTTRON", "identity_file": "~/.ssh/rsa/baka", "ssh_ip_address": "meow", "ssh_port": "111"}}
+{"tropics": {"ssh_sudo_user": "Volty", "identity_file": "~/.ssh/id_rsa/", "ssh_ip_address": "00", "ssh_port": "00"}, "foo.com": {"ssh_sudo_user": "VOLTTRON", "identity_file": "~/.ssh/id_rsa/best_host_ever", "ssh_ip_address": "1111", "ssh_port": "0000"}, "892abhe": {"ssh_sudo_user": "VOLTTRON", "identity_file": "~/.ssh/id_rsa/abbb.ini", "ssh_ip_address": "192.300.20", "ssh_port": "220"}}

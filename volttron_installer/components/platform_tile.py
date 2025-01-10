@@ -7,13 +7,14 @@ These objects should have the following properties:
 """
 
 from flet import *
+from typing import Union
 from volttron_installer.components.agent import Agent, LocalAgent
 from volttron_installer.modules.attempt_to_update_control import attempt_to_update_control
 from volttron_installer.modules.dynamic_routes import dynamic_routes
 from volttron_installer.modules.global_configs import global_agents
 from volttron_installer.components.background import gradial_background
 from volttron_installer.components.header import Header
-from volttron_installer.platform_tabs import agent_config
+from volttron_installer.modules.write_to_json import dump_to_var, write_to_file
 from volttron_installer.platform_tabs.agent_config import AgentConfig
 from volttron_installer.platform_tabs.platform_config import PlatformConfig
 from volttron_installer.components.platform_components.platform import Platform
@@ -37,12 +38,11 @@ class PlatformTile:
         self.platform.event_bus.subscribe("agent_appended", self.forward_agent_appended)
         self.platform.event_bus.subscribe("agent_removed", self.forward_agent_removed)
         self.platform.event_bus.subscribe("load_platform", self.load_agent_ui)
+        self.platform.event_bus.subscribe("platform_title_update", self.platform_title_update)
 
         self.home_container = container
         self.platform_tile = self.build_tile()
 
-        # BUTTON FOR HEADER
-        self.submit_button = OutlinedButton("Deploy Platform", disabled=True)
 
         # Initialize Platform Config tab
         self.platform_config_tab = PlatformConfig(
@@ -57,6 +57,11 @@ class PlatformTile:
         # Add route to dynamic routes dynamically
         view = self.platform_view()
         dynamic_routes[self.platform.generated_url] = view
+
+    def platform_title_update(self, data=None) -> None:
+        """Subscribed to signal `platform_title_update`"""
+        self.platform_tile.content.controls[0].controls[0].content.controls[0].value = self.platform.title
+        attempt_to_update_control(self.platform_tile.content.controls[0].controls[0])
 
     def load_agent_ui(self, data=None):
         """Subscribed to signal `load_platform`"""
@@ -91,47 +96,96 @@ class PlatformTile:
         self.platform.event_bus.publish("append_your_agent", agent)
 
     def get_background_color(self):
-        """
-        Get the background color based on platform activity.
-        """
+
         return "#9d9d9d" if self.platform.activity == "ON" else colors.with_opacity(0.65, "#9d9d9d")
 
     def get_text_color(self):
-        """
-        Get the text color based on platform activity.
-        """
+
         return "white" if self.platform.activity == "ON" else colors.with_opacity(0.65, "white")
 
     def get_status_color(self):
-        """
-        Get the status color based on platform activity.
-        """
+
         return "#00ff00" if self.platform.activity == "ON" else colors.with_opacity(0.65, "#ff0000")
 
     def update_platform_tile_ui(self, e=None):
-        """
-        Update the UI components of the platform tile based on the current platform state.
-        """
-        # print("platformTile: updating UI...")
-        # print("platformTile: I see activity is: ", self.platform.activity)
-        # Update UI components based on activity state
+
         self.platform_tile.bgcolor = self.get_background_color()
-        self.platform_tile.content.controls[0].controls[0].value = self.platform.title
-        self.platform_tile.content.controls[0].controls[1].value = self.platform.activity
-        self.platform_tile.content.controls[1].controls[1].value = len(self.platform.added_agents)
-        for control in self.platform_tile.content.controls:
-            for subcontrol in control.controls:
-                if isinstance(subcontrol, Text):
-                    subcontrol.color = self.get_text_color()
+
+        # Handling Platform Tile Title
+        self.platform_tile.content.controls[0].controls[1].content.controls[0].value = self.get_status()
+        self.platform_tile.content.controls[1].controls[1].content.controls[0].value = self.get_state()
+        self.platform_tile.content.controls[-1].controls[1].content.controls[0].value = len(self.platform.added_agents)
+        # Iterate over each row in platform_tile's content
+        for row_index, row in enumerate(self.platform_tile.content.controls):
+            # Iterate over each container inside the current row
+            for container_index, formatted_stat in enumerate(row.controls):
+                # Check if the container content is a Column
+                if isinstance(formatted_stat.content, Column):
+                    # Iterate over each Text control within the Column
+                    for text_index, text_control in enumerate(formatted_stat.content.controls):
+                        if isinstance(text_control, Text):
+                            text_control.color = self.get_text_color()
+                            # if row_index == 0 and container_index == 0:
+                            #     text_control.value = self.get_status()
+                            # elif row_index == 1 and container_index == 0:
+                            #     text_control.value = self.get_state()
+                            # elif row_index == 2 and container_index == 0:
+                            #     text_control.value = str(len(self.platform.added_agents))
 
         # Override blanket re-styling of text
-        self.platform_tile.content.controls[0].controls[1].color = self.get_status_color()
+        self.platform_title_update()
+
+    def get_status(self) -> str:
+        status = "ON" if self.platform.running == True else "OFF"
+        if status == "ON":
+            # Method to update platform tile UI
+            pass 
+        return status
+
+    def get_state(self) -> str:
+        return "Un-deployed" if self.platform.deployed == False else "Deployed"
 
     def build_tile(self) -> Container:
-        """
-        Build the platform tile container.
-        """
+        def format_tile_ui(
+            col1_text: Text, col2_text: Text,
+            col2_padding: Union[Padding, int] = 0, 
+            col1_expand: Union[int, bool] = False,
+            col2_expand: Union[int, bool] = False) -> Row:
+            return  Row(
+                        controls=[
+                            Container(
+                                expand=col1_expand,
+                                # bgcolor=colors.with_opacity(0.3, "red"),
+                                content=Column(
+                                    controls=[
+                                        col1_text,
+                                    ],
+                                    alignment=CrossAxisAlignment.START
+                                ),
+                            ), 
+                            Container(
+                                padding=col2_padding,
+                                expand=col2_expand,
+                                # bgcolor=colors.with_opacity(0.3, "blue"),
+                                content=Column(
+                                    controls=[
+                                        col2_text,
+                                    ],
+                                    alignment=CrossAxisAlignment.END
+                                ),
+                            )
+                        ],
+                        alignment=MainAxisAlignment.SPACE_BETWEEN,
+                    )
+
+        counter = dump_to_var("tile_id")
+        counter =+ 1
+        write_to_file("tile_id", counter)
+        tile_id_key = f"platform {counter}"
+
+        self.platform.tile_key = tile_id_key
         return Container(
+            key= tile_id_key,
             width=150,
             height=150,
             border_radius=25,
@@ -140,23 +194,129 @@ class PlatformTile:
             on_click=lambda e: self.platform.page.go(self.platform.generated_url), # Routes to individualized page for managing platform
             content=Column(
                 controls=[
-                    Row(controls=[Text(self.platform.title, color=self.get_text_color()), Text(value=f"{self.platform.activity}", color=self.get_status_color())]),
-                    Row(controls=[Text("Running Agents"), Text("0")]),
-                    Row(controls=[Text("Healthy Agents"), Text("0")]),
+                    # Title and running status(OFF/ON)
+                    format_tile_ui(Text(self.platform.title, color=self.get_text_color()), Text(value=f"{self.get_status()}", color=self.get_status_color())),
+                    # Row(
+                    #     controls=[
+                    #         Container(
+                    #             expand=3,
+                    #             bgcolor=colors.with_opacity(0.3, "red"),
+                    #             content=Column(
+                    #                 controls=[
+                    #                     Text(self.platform.title, color=self.get_text_color()),
+                    #                 ],
+                    #                 alignment=CrossAxisAlignment.START
+                    #             ),
+                    #         ), 
+                    #         Container(
+                    #             padding=padding.only(left=5),
+                    #             expand=1,
+                    #             bgcolor=colors.with_opacity(0.3, "blue"),
+                    #             content=Column(
+                    #                 controls=[
+                    #                     Text(value=f"{self.platform.activity}", color=self.get_status_color()),
+                    #                 ],
+                    #                 alignment=CrossAxisAlignment.END
+                    #             ),
+                    #         )
+                    #     ],
+                    #     alignment=MainAxisAlignment.SPACE_BETWEEN,
+                    #     spacing=30,
+                    # ),
+
+                    # State 
+                    format_tile_ui(Text("Status", color=self.get_text_color()), Text(self.get_state(), color=self.get_text_color())),
+                    # Row(
+                    #     controls=[
+                    #         Container(
+                                
+                    #             bgcolor=colors.with_opacity(0.3, "red"),
+                    #             content=Column(
+                    #                 controls=[
+                    #                     Text("Status", color=self.get_text_color()),
+                    #                 ],
+                    #                 alignment=CrossAxisAlignment.START
+                    #             ),
+                    #         ), 
+                    #         Container(
+                    #             # padding=padding.only(left=5),
+                    #             bgcolor=colors.with_opacity(0.3, "blue"),
+                    #             content=Column(
+                    #                 controls=[
+                    #                     Text("Deployed", color=self.get_text_color()),
+                    #                 ],
+                    #                 alignment=CrossAxisAlignment.END
+                    #             ),
+                    #         )
+                    #     ],
+                    #     alignment=MainAxisAlignment.SPACE_BETWEEN,
+                    # ),
+
+                    # Running Agents
+                    format_tile_ui(Text("Running Agents", color=self.get_text_color()), Text("0", color=self.get_text_color())),
+                    # Row(
+                    #     controls=[
+                    #         Container(
+                                
+                    #             bgcolor=colors.with_opacity(0.3, "red"),
+                    #             content=Column(
+                    #                 controls=[
+                    #                     Text("Running Agents", color=self.get_text_color()),
+                    #                 ],
+                    #                 alignment=CrossAxisAlignment.START
+                    #             ),
+                    #         ), 
+                    #         Container(
+                    #             # padding=padding.only(left=5),
+                    #             bgcolor=colors.with_opacity(0.3, "blue"),
+                    #             content=Column(
+                    #                 controls=[
+                    #                     Text("0", color=self.get_text_color()),
+                    #                 ],
+                    #                 alignment=CrossAxisAlignment.END
+                    #             ),
+                    #         )
+                    #     ],
+                    #     alignment=MainAxisAlignment.SPACE_BETWEEN,
+                    # ),
+
+                    # Healthy Agents
+                    format_tile_ui(Text("Healthy Agents", color=self.get_text_color()), Text("0", color=self.get_text_color()))
+                    # Row(
+                    #     controls=[
+                    #         Container(
+                                
+                    #             bgcolor=colors.with_opacity(0.3, "red"),
+                    #             content=Column(
+                    #                 controls=[
+                    #                     Text("Healthy Agents", color=self.get_text_color()),
+                    #                 ],
+                    #                 alignment=CrossAxisAlignment.START
+                    #             ),
+                    #         ), 
+                    #         Container(
+                    #             # padding=padding.only(left=5),
+                    #             bgcolor=colors.with_opacity(0.3, "blue"),
+                    #             content=Column(
+                    #                 controls=[
+                    #                     Text("0", color=self.get_text_color()),
+                    #                 ],
+                    #                 alignment=CrossAxisAlignment.END
+                    #             ),
+                    #         )
+                    #     ],
+                    #     alignment=MainAxisAlignment.SPACE_BETWEEN,
+                    # ),
                 ]
             )
         )
 
     def build_card(self) -> Container:
-        """
-        Build the card for the platform tile.
-        """
+
         return self.platform_tile
 
     def platform_view(self) -> View:
-        """
-        Build the view for the platform management page.
-        """
+
         # Initializing the header and background
         header = Header(self.platform, "/").return_header()
         background_gradient = gradial_background()
