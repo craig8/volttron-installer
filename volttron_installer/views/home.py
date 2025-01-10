@@ -1,12 +1,15 @@
 # home.py
 
+import pprint
 from flet import *
 
 from typing import Callable
 
 import logging
 
+from volttron_installer.modules import attempt_to_update_control
 from volttron_installer.modules.global_configs import find_dict_index
+from volttron_installer.modules.remove_from_controls import remove_from_selection
 
 _log = logging.getLogger(__name__)
 
@@ -46,8 +49,14 @@ def numerate_amount_of_platforms() -> str:
 def home_view(page: Page) -> View:
     from volttron_installer.views import InstallerViews as vi_views
 
+    def remove_platform(tile_key: str) -> None:
+        remove_from_selection(platform_tile_container, tile_key)
+        attempt_to_update_control.attempt_to_update_control(platform_tile_container)
+
     def refresh_platforms() -> None:
         global refreshed
+        if refreshed:
+            return
         for uid in platforms.keys(): #.keys()
             working_platform = platforms[uid] # platforms json dump var
             event_bus = ObjectCommunicator()
@@ -56,6 +65,10 @@ def home_view(page: Page) -> View:
             init_platform.address= working_platform["address"]
             init_platform.ports = working_platform["ports"]
             init_platform.added_agents = working_platform["agents"]
+            init_platform.running = working_platform["running"] 
+            init_platform.deployed = working_platform["deployed"] 
+
+            pprint.pprint(working_platform)
 
             # Load tile on platform tab
             init_platform_tile = PlatformTile(platform_tile_container, init_platform)
@@ -80,11 +93,16 @@ def home_view(page: Page) -> View:
         tabs_reference.selected_index = 2
         tabs_reference.update()
     
+    # Minor TODO: the signal of tab_change is redundant, should be called
+    # `refresh_form_tiles` or something like that, doesnt even need data input
     def tab_change(selected_index):
         global_event_bus.publish("tab_change", selected_index)
 
     if refreshed == False:
         refresh_platforms()
+
+
+    global_event_bus.subscribe("remove_platform", remove_platform)
 
     # Initialize tabs
     agent_setup_tab = agent_setup.AgentSetupTab(page).build_agent_setup_tab()
@@ -97,6 +115,8 @@ def home_view(page: Page) -> View:
     tabs_reference = Tabs(
         selected_index=0,
         animation_duration=300,
+
+        # Again, should just publish refresh_form_tiles signal or something 
         on_change= lambda e: tab_change(e.control.selected_index),
         tabs=[
             Tab(

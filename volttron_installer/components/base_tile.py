@@ -1,10 +1,12 @@
 from volttron_installer.modules.create_field_methods import divide_fields, field_pair
 from volttron_installer.components.default_tile_styles import build_default_tile
+from volttron_installer.components.general_notifier import GeneralNotifier
 from volttron_installer.modules.write_to_json import write_to_file, dump_to_var
-from volttron_installer.modules.global_configs import find_dict_index
+from volttron_installer.modules.show_selected_tile import show_selected_tile
 from volttron_installer.modules.global_event_bus import global_event_bus
 from volttron_installer.modules.remove_from_controls import remove_from_selection
 from volttron_installer.modules.attempt_to_update_control import attempt_to_update_control
+from time import sleep
 from flet import *
 from dataclasses import fields
 import asyncio
@@ -39,6 +41,8 @@ class BaseForm:
         self.non_fields = []
         self.additional_content = [] # for anything special
 
+        self.general_notifier = GeneralNotifier(page=self.page)
+
         self.overwrite: bool = False
 
         for key, field in self.form_fields.items():
@@ -47,17 +51,118 @@ class BaseForm:
             else:
                 self.classify_field(field)
 
-        self.submit_button = OutlinedButton(text="Save", disabled=True, on_click=self.save_config)
+        self.revert_button = IconButton(icon=icons.UNDO, tooltip="Undo changes", visible=False)
+        self.changes_indicator: Stack[Container] = Stack(
+                                        [
+                                            Container(
+                                                # bgcolor="purple",
+                                                content=Container(width=20, height=20),
+                                                alignment=alignment.center
+                                            ),
+                                            Container(
+                                                content=Container(
+                                                    width=20, 
+                                                    height=20, 
+                                                    bgcolor=colors.with_opacity(1, "orange"), 
+                                                    border_radius=50, 
+                                                    animate=animation.Animation(2000, AnimationCurve.EASE_IN)
+                                                    ),
+                                                alignment=alignment.center,
+                                            ),
+                                        ],
+                                        visible=False,
+                                        width=50,
+                                        height=50,
+                                    )
+
+        self.changed = False
+        self.is_detecting_changes = False
+        # Initialize other necessary variables or UI components
+
+        self.submit_button = OutlinedButton(text="Save", disabled= not self.changed, on_click=self.save_config)
         self.formatted_fields: any = self.create_fields()
         self._form = Column(
             scroll=ScrollMode.AUTO,
             expand=3,
             controls=[
                 *self.formatted_fields,
-                self.submit_button,
+                Row(
+                    [
+                        Container(content=self.submit_button, margin=margin.only(left=10)), 
+                        self.revert_button, 
+                        self.changes_indicator
+                    ]
+                ),
                 *self.additional_content
             ]
         )
+
+    def changes_finalized(self, message: str | int = False):
+        """Once we either revert or save our changes,
+         we should disable the indicator and revert button """
+        self.revert_button.visible = False
+        self.changes_indicator.visible = False
+        self.changed = False
+        self.is_detecting_changes = False  # Reset the flag when changes are finalized
+
+        # Update all UI components
+        attempt_to_update_control(self.revert_button)
+        attempt_to_update_control(self.changes_indicator)
+        self.toggle_submit_button(self.changed)
+        attempt_to_update_control(self.page)
+        
+        if message:
+            self.general_notifier.display_snack_bar(message=message)
+
+    def revert_changes(self, revert_map: dict) -> None:
+        """Method to revert changes made to the form.
+        Args:
+            revert_map: A dictionary containing a Flet TextField and the previous saved data to
+                        revert to as a kwarg
+        """
+        textfields: list[TextField] = revert_map.keys()
+        
+        print(revert_map)
+
+        for i in textfields:
+            i.value = revert_map[i]
+            attempt_to_update_control(i)
+        self.toggle_submit_button(self.changed)
+        self.changes_finalized(2)
+
+    def changes_detected(self) -> None:
+        if self.is_detecting_changes:
+            return  # Exit if the function is already running
+        self.is_detecting_changes = True  # Set the flag to indicate the function is running
+        print("changes are #detected \n")
+        self.changed = True
+        self.revert_button.visible=True
+        self.changes_indicator.visible=True
+        self.page.update()
+        
+        ring_one: Container = self.changes_indicator.controls[1].content
+        while self.changed:
+            if ring_one.height == 20:
+                ring_one.animate = animation.Animation(1500, AnimationCurve.EASE_IN)
+                ring_one.height = 24
+                ring_one.width = 24
+                ring_one.bgcolor=colors.with_opacity(0.45, "orange")
+                self.page.update()
+                sleep(2.5)
+
+
+            elif ring_one.height == 24:
+                ring_one.animate = animation.Animation(1500, AnimationCurve.EASE_IN)
+                ring_one.height = 20
+                ring_one.width = 20
+                ring_one.bgcolor=colors.with_opacity(.9, "orange")
+                
+                self.page.update()
+                sleep(2.5)
+
+            elif self.changed == False:
+                print("we broke bro")
+                break
 
     def classify_field(self, field):
         if hasattr(field, "key"):
@@ -97,6 +202,8 @@ class BaseForm:
         # Implement field validation logic and toggle submit button state.
         valid: bool = all(field.value for field in self.val_constructor)
         self.toggle_submit_button(valid)
+        if not self.is_detecting_changes:
+            self.changes_detected()
 
     async def save_config(self, e) -> None:
         # This method will be overwritten
@@ -104,7 +211,7 @@ class BaseForm:
 
     def toggle_submit_button(self, state: bool) -> None:
         self.submit_button.disabled = not state
-        self.submit_button.update()
+        attempt_to_update_control(self.submit_button)
 
     def write_to_file(self, file: str, global_lst: list):
         write_to_file(file, global_lst)
@@ -113,20 +220,22 @@ class BaseForm:
         if old_key in dictionary:
             dictionary[new_key] = dictionary.pop(old_key)
 
-    async def check_overwrite(self, old_name: str, working_dict: dict, name: str) -> bool | None | str:
-        check_overwrite = bool | None | str
-        if old_name == name:
-            check_overwrite = "rename"
+    async def detect_conflict(self, working_dict: dict, new_name: str, old_name: str) -> bool | str:
+        print("\nDetecting if there is a conflict")
+        
+        if new_name == old_name:
+            print("We are just saving without changing the name.")
+            return "rename"  # No conflict since it's the same name
+        
+        print(f"Here is our working dict:\n{working_dict}\nHere is the new name we are trying to parse:\n{new_name}")
+
+        if new_name in working_dict:
+            print('Conflict detected')
+            overwrite_decision = await self.warning_modal(new_name)
+            return overwrite_decision  # True if we want to overwrite, False otherwise
         else:
-            check_overwrite= await self.detect_conflict(working_dict, name, old_name)
-            if check_overwrite == True:
-                # Who ever needs to use the will have their own check to see if this function
-                # has returned True, and they'll handle the functionality
-                # global_event_bus.publish("soft_remove", self.object.tile.key)
-                return True
-            elif check_overwrite == False:
-                return False
-        return check_overwrite
+            return "clean"  # No conflict, as the new name does not exist 
+
 
     async def warning_modal(self, new_name: str) -> bool:
         loop = asyncio.get_event_loop()
@@ -145,7 +254,9 @@ class BaseForm:
             alignment= alignment.center,
             controls=[
                 Text("WARNING!", color="red", size=22),
-                Text(f"You're about to overwrite a configuration named: {new_name}", size=18),
+                Text(f"You're about to overwrite a configuration named: ", spans=[
+                    TextSpan(f"{new_name}", TextStyle(decoration=TextDecoration.UNDERLINE,font_family="Consolas"))
+                ], size=18),
                 Row(
                     alignment=MainAxisAlignment.SPACE_AROUND,
                     controls=[
@@ -173,19 +284,17 @@ class BaseForm:
         await future
         return self.overwrite
 
-    async def detect_conflict(self, working_dict: dict, item: str, old_name: str) -> bool | None | str:
-        if old_name != item:
-            return "rename" # We are just renaming the configuration, so we can return
+    async def check_overwrite(self, old_name: str, working_dict: dict, new_name: str) -> bool | str:
+        print(f"\nChecking the overwrite of '{old_name}' with '{new_name}'")
         
-        working_list = working_dict.keys()
-        if item in working_list:
-            overwrite_decision = await self.warning_modal(item)
-            if overwrite_decision:
-                return True
-            else:
-                return False
-        else:
-            return None # item was not found.
+        if old_name == new_name:
+            print("We are renaming the existing item without changing its name.")
+            return "rename"
+        
+        conflict_detected = await self.detect_conflict(working_dict, new_name, old_name)
+        
+        return conflict_detected
+
                 
     def build_form(self) -> Column:
         return self._form
@@ -193,26 +302,25 @@ class BaseForm:
 class BaseTab:
     def __init__(self, instance_tile_column: Column, page: Page):
         self.page = page
+
+        # Get our column that holds our tiles and enable scroll on it
         self.instance_tile_column = instance_tile_column
+        self.instance_tile_column.scroll = ScrollMode.AUTO
 
         # Initialize column widths
         self.left_column_width = 200  # Initial width for the instance tile column
         self.right_column_width = page.width - self.left_column_width - 10  # Initial width for the form column
         
-        self.left_instance_column: Container = Container(
-                                        width=self.left_column_width,
-                                        content=self.instance_tile_column
-                                    )
+        # Get our tab so the children can access a consistent variable without having to run the function again
         self.tab = self.build_base_tab()
-        self.__post_init__()
 
-    def __post_init__(self)->None:
-        #self.left_instance_column.content.scroll=ScrollMode.ALWAYS
-        pass
+        # Init general notifier
+        self.general_notifier = GeneralNotifier(self.page)
+        global_event_bus.subscribe("soft_remove", self.soft_remove)
 
     def build_base_tab(self):
         # Initialize form container
-        form_container = Container(width=self.right_column_width, content=Column(expand=3))
+        form_container = Container(width=self.right_column_width, content=ListView(controls=[Column(expand=3)], expand=3))
 
         def pan_update(e):
             # Perform the panning logic to adjust column widths
@@ -224,8 +332,9 @@ class BaseTab:
             form_container.width = self.right_column_width
 
             # Refresh the UI
-            self.instance_tile_column.update()
-            form_container.update()
+            # self.instance_tile_column.update()
+            # form_container.update()
+            tab_view.update()
             self.page.update()
         
         vertical_divider = GestureDetector(
@@ -247,7 +356,7 @@ class BaseTab:
             content=Row(
                 spacing=0,
                 controls=[
-                    self.instance_tile_column,
+                    ListView(controls=[Container(content=self.instance_tile_column, padding=padding.only(top=7))], expand=2),
                     vertical_divider,
                     form_container
                 ],
@@ -300,8 +409,9 @@ class BaseTab:
         self.configure_new_instance(file_name, global_list, new_instance_values, new_tile, new_form, new_instance)
 
     def configure_new_instance(self, file_name: str, global_list: list, instance_values, tile: Container, form: BaseForm, instance):
-        tile.on_click =lambda e: self.select_tile(e, form)
-        tile.content.controls[1].on_click = lambda e: self.remove_self(global_list, file_name, instance_attributes={"name" : instance_values[0], "id" : tile.key})
+        tile.on_click = lambda e: self.select_tile(e, form)
+        tile.content.controls[1].on_click = lambda e: self.remove_warning_wrapper(e, global_list, file_name, 
+                                                                                   instance_attributes={"name": instance_values[0], "id": tile.key})
         self.instance_tile_column.controls.append(tile)
         attempt_to_update_control(self.instance_tile_column)
         form.refresh_form(instance)
@@ -314,28 +424,80 @@ class BaseTab:
         return False
     
     def soft_remove(self, key: str) -> None:
-        """In the case of an over written config, we simply remove the tile from view
-        as we can just use our old overwritten config 
-        """
         remove_from_selection(self.instance_tile_column, key)
-        self.tab.content.controls[2].content = Column(expand=3)
+        self.tab.content.controls[2].content.controls[0] = Column(expand=3)
         self.page.update()
-    
-    def remove_self(self, global_lst: dict, file_name: str, instance_attributes: dict):
+
+    async def remove_self(self, global_lst: dict, file_name: str, instance_attributes: dict):
         if instance_attributes["name"] in global_lst.keys():
             del global_lst[instance_attributes["name"]]
         write_to_file(file_name, global_lst)
         remove_from_selection(self.instance_tile_column, instance_attributes["id"])
-        self.tab.content.controls[2].content = Column(expand=3)
+        self.tab.content.controls[2].content.controls[0] = Column(expand=3)
         self.page.update()
         global_event_bus.publish("update_global_ui", None)
-    
-    def select_tile(self, e, instance_form: BaseForm)->None:
-        from volttron_installer.modules.show_selected_tile import show_selected_tile
+        self.general_notifier.display_snack_bar("Removed successfully!")
+
+    async def remove_warning(self, global_lst: dict, file_name: str, instance_attributes: dict) -> None:
+        loop = asyncio.get_event_loop()
+        subject_name = instance_attributes["name"]
+
+        def remove_failed(e):
+            self.page.close(modal)
+            loop.call_soon_threadsafe(future.set_result, False)
+
+        def remove_continued(e):
+            self.page.close(modal)
+            loop.call_soon_threadsafe(future.set_result, True)
+
+        modal_contents = Column(
+            controls=[
+                Text("WARNING!", color="red", size=22),
+                Text(f"Are you sure you want to permanently remove ", spans=[
+                    TextSpan(
+                        f"{subject_name}", 
+                        TextStyle(
+                            font_family="Consolas",
+                            bgcolor=colors.with_opacity(0.2, "black")
+                            ))
+                        ]
+                        ,size=18
+                    ),
+                Row(
+                    alignment=MainAxisAlignment.SPACE_AROUND,
+                    controls=[
+                        OutlinedButton(content=Text("Cancel", color="red"), on_click=remove_failed),
+                        OutlinedButton(text="Continue", on_click=remove_continued),
+                    ]
+                )
+            ]
+        )
+
+        modal = AlertDialog(
+            modal=False,
+            bgcolor="#00000000",
+            content=Container(
+                **modal_styles2(),
+                width=400,
+                height=170,
+                content=modal_contents
+            )
+        )
+
+        future = loop.create_future()
+        self.page.open(modal)
+        result = await future
+        if result:
+            await self.remove_self(global_lst, file_name, instance_attributes)
+
+    def select_tile(self, e, instance_form: BaseForm) -> None:
         self.show_selected_form(e, instance_form)
         show_selected_tile(e, self.instance_tile_column)
         self.page.update()
 
     def show_selected_form(self, e, instance_form: BaseForm) -> None:
-        self.tab.content.controls[2].content = instance_form.build_form()
+        self.tab.content.controls[2].content.controls[0] = instance_form.build_form()
         attempt_to_update_control(self.tab)
+
+    def remove_warning_wrapper(self, e, global_list, file_name, instance_attributes):
+        asyncio.run(self.remove_warning(global_list, file_name, instance_attributes))

@@ -46,3 +46,12 @@ def progress_styles()-> dict:
         "finalized_color": "green",
         "check_color" : "white"
     }
+
+def pulsing_changes_circle() -> dict:
+    return {
+        "border_radius" : 50,
+        "gradient" : RadialGradient(
+                        center=Alignment(0.0, 0.0),
+                        colors=[colors.with_opacity(0.6, "white"), colors.with_opacity(0.6, "orange")]
+                    )
+    }

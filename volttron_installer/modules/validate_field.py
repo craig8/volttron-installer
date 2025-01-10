@@ -108,20 +108,31 @@ def replace_single_quotes(data: str) -> str:
     # Replace single quotes with double quotes
     return data.replace("'", '"')
 
-def check_format(data: str) -> str:
-    data = replace_single_quotes(data)  # Normalize the quotes
+def preprocess_string(input_string: str) -> str:
+    # Remove outer single quotes if they are present
+    if input_string.startswith("'") and input_string.endswith("'"):
+        input_string = input_string[1:-1]
+    return input_string.strip()
 
+def check_format(input_string: str) -> str | bool:
+    # Step 1: Check if the input is valid JSON
     try:
-        json.loads(data)
-        return "JSON"
+        json_string = replace_single_quotes(input_string)
+        json_data = json.loads(json_string)
+        # Additionally, check common JSON issues (if required)
+        if isinstance(json_data, (dict, list)):
+            return "JSON"
     except json.JSONDecodeError:
-        # It didn't work as JSON, continue to YAML check
         pass
-    
+
+    # Step 2: Check if the input is valid YAML
     try:
-        yaml.safe_load(data)
-        return "YAML"
+        yaml_string = input_string.strip()
+        yaml_data = yaml.safe_load(yaml_string)
+        # Ensure it's non-scalar to confirm it's a complex YAML-like structure
+        if not isinstance(yaml_data, (str, int, float, bool, type(None))):
+            return "YAML"
     except yaml.YAMLError:
         pass
 
-    return "UNKNOWN"
+    return False

@@ -9,7 +9,7 @@ from volttron_installer.modules.styles import modal_styles, progress_styles
 class ProgressBar:
     def __init__(self, page: Page, step: str):
         self.page = page
-        self.styles = progress_styles
+        self.styles = progress_styles()
         self.step = step
         
         self.separating_line: Container = Container(

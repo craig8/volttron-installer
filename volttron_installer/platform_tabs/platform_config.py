@@ -31,17 +31,7 @@ class PlatformConfig:
     def __init__(self,
                  shared_instance: Platform,
                  ) -> None:
-        """
-        Initialize a PlatformConfig instance.
-
-        Args:
-            name_field (TextField): Text field for the platform name.
-            addresses_field (TextField): Text field for the platform addresses.
-            ports_field (TextField): Text field for the platform ports.
-            shared_instance (Platform): Shared instance of the Platform class.
-            platform_config_agent_column (Column): Column to hold the platform configuration agents.
-            agent_config_column (Column): Column to hold the agent configuration.
-        """
+        
         # Initialize the shared instance
         self.platform = shared_instance
         
@@ -51,6 +41,7 @@ class PlatformConfig:
         self.platform.event_bus.subscribe("append_your_agent", self.append_agent)
         self.platform.event_bus.subscribe("publish_commits", self.write_to_platform)
         self.platform.event_bus.subscribe("load_platform", self.load_platform)
+        self.platform.event_bus.subscribe("platform_title_update", self.platform_title_update)
         
         # Name field initialization
         self.name_field = TextField(hint_text="Only letters, numbers, and underscores are allowed.", on_change=self.validate_fields)
@@ -129,6 +120,11 @@ class PlatformConfig:
             )
         )
 
+
+    def platform_title_update(self, data=None):
+        self.name_field.value=self.platform.title
+        attempt_to_update_control(self.name_field)
+
     def load_platform(self, data=None) -> None:
         """Subscribed to signal `load_platform`"""
         # print("Platform is loading")
@@ -180,12 +176,18 @@ class PlatformConfig:
 
     def update_platform_config_ui(self, data=None):
         self.update_host_dropdown()
+        self.update_agents_dropdown()
     
     def update_host_dropdown(self):
         new_host_field = numerate_host_dropdown()
         self.host_field_pair.content.controls[1].content = new_host_field  # Update the host field with new host values
         self.host_field = new_host_field
         attempt_to_update_control(self.host_field)
+
+    def update_agents_dropdown(self):
+        new_agent_dropdown = numerate_agent_dropdown()
+        self.agent_dropdown_with_button.controls[0].content = new_agent_dropdown
+        attempt_to_update_control(self.agent_dropdown_with_button)
 
     def validate_text(self, text_field: TextField) -> None:
         """

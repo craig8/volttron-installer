@@ -1,14 +1,15 @@
-from re import A
 from flet import *
 from volttron_installer.components.agent import LocalAgent
 from volttron_installer.components.platform_components.platform import Platform
 from volttron_installer.modules.populate_dropdowns import numerate_agent_dropdown
-from volttron_installer.modules.global_configs import agent_specific_configs, global_agents
 from volttron_installer.platform_tabs import local_config_store
 from volttron_installer.modules.attempt_to_update_control import attempt_to_update_control
 from volttron_installer.modules.remove_from_controls import remove_from_selection
 from volttron_installer.modules.show_selected_tile import show_selected_tile
-import yaml
+from volttron_installer.modules.validate_field import check_yaml_field, check_json_field, check_format
+from volttron_installer.components.error_modal import error_modal
+from volttron_installer.modules.prettify_string import prettify_json, prettify_yaml
+import yaml, json
 
 class AgentConfig:
     def __init__(self, shared_instance: Platform) -> None:
@@ -34,14 +35,14 @@ class AgentConfig:
             scroll=ScrollMode.AUTO,
             alignment=MainAxisAlignment.START,
             controls=[
-                self.agent_dropdown,
-                self.add_agent_button
+                Row(
+                    [    
+                        self.agent_dropdown,
+                        self.add_agent_button
+                    ]
+                )
             ]
         )
-
-        # Immediately append necessary components
-        # Control holding a placeholder until an agent has been selected, which will
-        # replace this placeholder with the agent's own configuration view
         self.configure_agent_view = Container(
             expand=3, 
             content=Container(
@@ -54,15 +55,16 @@ class AgentConfig:
         self._comprehensive_view = Column(
             controls=[
                 Container(
+                    padding=10,
                     height=600,
                     margin=margin.only(left=10, right=10, bottom=5, top=5),
                     bgcolor="#20f4f4f4",
                     border_radius=12,
                     content=Row(
                         controls=[
-                            self.agent_config_column,
+                            ListView(controls=[Container(padding=padding.only(top=7),content=self.agent_config_column)], expand=3),
                             self.divider,
-                            self.configure_agent_view
+                            ListView(controls=[Container(padding=padding.only(top=7),content=self.configure_agent_view)], expand=3)
                         ]
                     )
                 ),
@@ -73,31 +75,51 @@ class AgentConfig:
             scroll=ScrollMode.AUTO
         )
 
-    def agent_config_section(self, agent: LocalAgent) -> None:
+    def agent_config_section(self, agent: LocalAgent) -> Container:
         
         def write_to_platform(data=None):
-            # print("this is our agent type shi", agent)
-            # print("this is what we got in platform", self.platform.added_agents[agent.agent_name])
             self.platform.added_agents[agent.agent_name]["agent_configuration"] = agent.agent_configuration
 
         def check_config_submit(field: TextField):
-            from volttron_installer.modules.validate_field import check_yaml_field, check_json_field
-            from volttron_installer.components.error_modal import error_modal
-            from volttron_installer.modules.clean_json_string import clean_json_string
-            custom_config: str = field.value
-            if check_json_field(field):
-                # print("JSON")
-                agent.agent_configuration = clean_json_string(custom_config)
-            elif check_yaml_field(field):
-                agent.agent_configuration = custom_config
-            else:
+            valid_config = check_format(agent_config_field.value)
+            if valid_config == False:
                 self.platform.page.open(error_modal())
                 return
-            # print("yooo i just saved an agent config", agent.agent_configuration)
+            
+            config_data = ""
+            try:
+                if valid_config == "JSON":
+                    content_data = agent_config_field.value
+                    
+                    # Parse the JSON content using json.loads
+                    parsed_data = json.loads(content_data)
+                    config_data = parsed_data
+                    check_json_field(agent_config_field)
+            except json.JSONDecodeError as e:
+                print(f"JSON Decode Error from saving agent configuration in agent_setup.py: {e}")
+
+            if valid_config == "YAML":
+                check_yaml_field(agent_config_field)
+                # Reconvert to YAML string to preserve format for saving/displaying
+                valid_config_str = yaml.dump(agent_config_field.value, sort_keys=False, default_flow_style=False)
+                config_data = valid_config_str
+                
+            # As long as nothing fails, this should hit
+            agent.agent_configuration = config_data
+            auto_format_field(agent_config_field)
+            self.platform.snack_bar.display_snack_bar(1)
+            
+        def auto_format_field( config_field: TextField) -> None:
+            config_type = check_format(str(agent.agent_configuration))
+            if config_type == "JSON":
+                config_field.value = prettify_json(agent.agent_configuration)
+            elif config_type == "YAML":
+                config_field.value = prettify_yaml(agent.agent_configuration)
+            attempt_to_update_control(config_field)
 
         self.platform.event_bus.subscribe("publish_commits", write_to_platform)
             
-        input_json_field = TextField(
+        agent_config_field = TextField(
                                 multiline=True, 
                                 value=agent.agent_configuration, 
                                 label="Input Custom JSON or YAML"
@@ -117,14 +139,15 @@ class AgentConfig:
                     Container(
                         content=Column(
                             [
-                                input_json_field,
-                                OutlinedButton(text="Save", on_click=lambda e: check_config_submit(input_json_field))
+                                agent_config_field,
+                                OutlinedButton(text="Save", on_click=lambda e: check_config_submit(agent_config_field))
                             ]
                         )
                     ),
                 ]
             )
         )
+        auto_format_field(agent_config_field)
         return agent_configuration_menu
 
     def write_agents_to_platform(self, data=None) -> None:
@@ -133,8 +156,9 @@ class AgentConfig:
 
     def update_self_ui(self, data= None):
         updated_agent_dropdown = numerate_agent_dropdown()
-        self.agent_config_column.controls[0] = updated_agent_dropdown
-        self.platform.page.update()
+        self.agent_config_column.controls[0].controls[0] = updated_agent_dropdown
+        attempt_to_update_control(self.agent_config_column)
+        attempt_to_update_control(self._comprehensive_view)
 
     def forward_agent_removed(self, agent: LocalAgent) -> None:
         self.platform.event_bus.publish("agent_removed", agent)
@@ -142,6 +166,12 @@ class AgentConfig:
     def remove_agent(self, agent: LocalAgent) -> None:
         key: str = agent.tile.key
         remove_from_selection(self.agent_config_column, key)
+        self._comprehensive_view.controls[1] = Container(height=900)
+        self.configure_agent_view.content = Container(
+                    # Place holder text
+                    content=Text("Select an agent to configure!")
+                )
+        attempt_to_update_control(self._comprehensive_view)
 
     def forward_agent_appended(self, agent_name: str) -> None:
         self.platform.event_bus.publish("agent_appended", agent_name)

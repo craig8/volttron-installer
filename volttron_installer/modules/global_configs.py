@@ -37,17 +37,6 @@ global_hosts: dict = dump_to_var("hosts")
 # Establishing drivers.json into global_drivers
 global_drivers: dict = dump_to_var("drivers")
 
-agent_specific_configs: dict = dump_to_var("agent_specific_configs")
-"""
-{
-    platform_uid : {
-        agent_name : blah,
-        driver : {
-                    driver: stuff 
-                    }
-    },
-}
-"""
 platforms: dict = dump_to_var("platforms")
 
 

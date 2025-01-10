@@ -9,7 +9,6 @@ PERSISTENT_HOSTS_FILE = os.path.join(PERSISTENT_DIR, "hosts.json")
 PERSISTENT_AGENTS_FILE = os.path.join(PERSISTENT_DIR, "agents.json")
 PERSISTENT_DRIVERS_FILE = os.path.join(PERSISTENT_DIR, "drivers.json")
 PERSISTENT_TILE_ID_FILE = os.path.join(PERSISTENT_DIR, "tile_id.json")
-PERSISTENT_AGENT_SPECIFIC_CONFIGS_FILE = os.path.join(PERSISTENT_DIR, "agent_specific_configs.json")
 PERSISTENT_PLATFORMS_FILE = os.path.join(PERSISTENT_DIR, "platforms.json")
 
 # Ensure the directory exists
@@ -20,7 +19,6 @@ file_map = {
     "agents" or "a": PERSISTENT_AGENTS_FILE,
     "drivers" or "d": PERSISTENT_DRIVERS_FILE,
     "tile_id" or "pID": PERSISTENT_TILE_ID_FILE,
-    "agent_specific_configs" or "asc" : PERSISTENT_AGENT_SPECIFIC_CONFIGS_FILE,
     "platforms" or "p" : PERSISTENT_PLATFORMS_FILE
 }
 
@@ -30,7 +28,7 @@ def write_to_file(file: str, var: any) -> None:
     JSON file that the app will read and right from.
 
     list of file names:
-    hosts, agents, drivers, tile_id, agent_specific_configs, platforms
+    hosts, agents, drivers, tile_id, platforms
     """
     with open(file_map[file], "w") as f:
         json.dump(var, f)
